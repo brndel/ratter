@@ -1,0 +1,359 @@
+* {
+    box-sizing: border-box;
+    margin: 0pt;
+}
+
+/* App-wide styling */
+body {
+    background-color: #0f1116;
+    color: #ffffff;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    margin: 20px;
+}
+
+#hero {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+#links {
+    width: 400px;
+    text-align: left;
+    font-size: x-large;
+    color: white;
+    display: flex;
+    flex-direction: column;
+}
+
+#links a {
+    color: white;
+    text-decoration: none;
+    margin-top: 20px;
+    margin: 10px 0px;
+    border: white 1px solid;
+    border-radius: 5px;
+    padding: 10px;
+}
+
+#links a:hover {
+    background-color: #1f1f1f;
+    cursor: pointer;
+}
+
+#header {
+    max-width: 1200px;
+}
+
+/* Navbar */
+#navbar {
+    display: flex;
+    flex-direction: row;
+}
+
+#navbar a {
+    color: #ffffff;
+    margin-right: 20px;
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+#navbar a:hover {
+    cursor: pointer;
+    color: #91a4d2;
+}
+
+/* Blog page */
+#blog {
+    margin-top: 50px;
+}
+
+#blog a {
+    color: #ffffff;
+    margin-top: 50px;
+}
+
+.device-list {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(auto-fit, minmax(400pt, 1fr));
+    gap: 8pt;
+
+    .device-list-entry {
+        background-color: #1e222d;
+        border-radius: 8pt;
+        padding: 4pt;
+
+        .endpoint-list {
+            display: flex;
+            flex-direction: column;
+            align-items: start;
+            gap: 8pt;
+
+            .endpoint {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                background-color: #0f1116;
+                border-radius: 4pt;
+                padding: 4pt;
+                gap: 4pt;
+
+                .endpoint-header {
+                    display: flex;
+                    flex-direction: row;
+                    gap: 4pt;
+
+                    span {
+                        background-color: #1e222d;
+                        border-radius: 0pt;
+                        height: 100%;
+                        padding: 2pt;
+                    }
+
+                    .endpoint-label {
+                        background-color: rgb(35, 255, 141);
+                        color: black;
+                        font-weight: bolder;
+                    }
+                }
+            }
+        }
+    }
+}
+
+.device-card {
+    background-color: #1e222d;
+    padding: 8pt;
+    border-radius: 8pt;
+}
+
+.endpoint-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.device-type-list {
+    display: flex;
+    gap: 4pt;
+}
+
+span.device-type {
+    padding: 4pt;
+    border-radius: 4pt;
+    background-color: #0f1116;
+}
+
+.cluster-not-implemented {
+    color: rgb(107, 101, 130);
+}
+
+.device-control {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background-color: #0d0d0d;
+    padding: 8pt;
+    border-radius: 16pt;
+    gap: 8pt;
+}
+
+.maybe-disabled-controls {
+    display: flex;
+    flex-direction: inherit;
+    gap: inherit;
+
+    &.disabled {
+        opacity: 0.5;
+        pointer-events: none;
+    }
+
+    transition: opacity 200ms;
+}
+
+input[type="range"].brightness-slider {
+    width: 100%;
+    height: 42pt;
+    background: transparent;
+    overflow: hidden;
+    border-radius: 6pt;
+
+    &::-moz-range-thumb {
+        background-color: transparent;
+        height: 100%;
+        width: 0pt;
+        visibility: hidden;
+    }
+
+    &::-moz-range-track {
+        background-color: #464646;
+        width: 100%;
+        height: 100%;
+        cursor: pointer;
+        border-radius: 6pt;
+    }
+
+    &::-moz-range-progress {
+        background-color: #f9ebd2;
+        width: 100%;
+        height: 100%;
+        cursor: pointer;
+        border-radius: 6pt;
+    }
+}
+
+.color-block {
+    height: 32pt;
+    width: 32pt;
+    align-self: first baseline;
+    border-radius: 6pt;
+
+    &.is-off {
+        background-color: #1c1c1c !important;
+        border: 2pt solid #c2c2c2;
+    }
+}
+
+input[type="range"].hue-slider {
+    width: 100%;
+    height: 12pt;
+    background: linear-gradient(
+        to right in hsl longer hue,
+        hsl(0, 100%, 50%),
+        hsl(359, 100%, 50%)
+    );
+    overflow: hidden;
+    border-radius: 6pt;
+    padding: 4pt;
+
+    &::-moz-range-thumb {
+        background-color: black;
+        height: 4pt;
+        width: 4pt;
+        border: none;
+        /* border: 2pt solid white; */
+        /* border: none; */
+        border-radius: 2pt;
+    }
+}
+
+input[type="range"].saturation-slider {
+    width: 100%;
+    height: 12pt;
+    background: linear-gradient(
+        to right in hsl longer hue,
+        hsl(0, 0%, 100%),
+        hsl(359, 100%, 50%)
+    );
+    overflow: hidden;
+    border-radius: 6pt;
+    padding: 4pt;
+
+    &::-moz-range-thumb {
+        background-color: black;
+        height: 4pt;
+        width: 4pt;
+        border: none;
+        /* border: 2pt solid white; */
+        /* border: none; */
+        border-radius: 2pt;
+    }
+}
+
+input[type="range"].temperature-slider {
+    width: 100%;
+    height: 12pt;
+    /* background: linear-gradient(to right in hsl longer hue, hsl(0, 0%, 100%), hsl(359, 100%, 50%)); */
+    overflow: hidden;
+    border-radius: 6pt;
+    padding: 4pt;
+
+    &::-moz-range-thumb {
+        background-color: black;
+        height: 4pt;
+        width: 4pt;
+        border: none;
+        /* border: 2pt solid white; */
+        /* border: none; */
+        border-radius: 2pt;
+    }
+}
+
+button.on-off-button {
+    display: flex;
+    padding: 8pt;
+    border-radius: 8pt;
+    border: none;
+    cursor: pointer;
+
+    background-color: #303031;
+    color: #66686b;
+
+    &.on {
+        color: #372b0d;
+        background-color: #deffa8;
+    }
+
+    transition:
+        background-color 200ms,
+        color 200ms;
+}
+
+.tab-bar {
+    width: 100%;
+    display: flex;
+    gap: 4pt;
+    padding: 4pt;
+    background-color: #181b21;
+    border-radius: 8pt;
+
+    border: 2pt solid #15161b;
+
+    button {
+        cursor: pointer;
+        flex: 1;
+        border-radius: 4pt;
+        background-color: transparent;
+        color: white;
+        padding: 2pt;
+
+        border: 2pt solid transparent;
+
+        &.selected {
+            background-color: #ffffff23;
+        }
+
+        transition: background-color 200ms;
+    }
+}
+
+.popover-root {
+    anchor-scope: --popover;
+
+    .popover-button {
+        anchor-name: --popover;
+        padding: 0;
+        margin: 0;
+        border: none;
+        background-color: transparent;
+        cursor: pointer;
+    }
+
+    .popover-content {
+        position: absolute;
+        position-anchor: --popover;
+        position-area: right;
+        background-color: #181b21;
+        color: white;
+        border: none;
+        border-radius: 8pt;
+        padding: 8pt;
+        margin: 8pt;
+
+        &::backdrop {
+            background-color: rgba(17, 17, 17, 0.238);
+        }
+    }
+}
