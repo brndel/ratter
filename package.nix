@@ -23,6 +23,6 @@ pkgs.rustPlatform.buildRustPackage {
   installPhase = ''
     mkdir -p $out/bin
 
-    cp target/dx/ratter-app/release/web/ $out/bin/web/
+    cp -r target/dx/ratter-app/release/web/ $out/bin/web/
   '';
 }
