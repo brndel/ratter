@@ -40,11 +40,12 @@ in
       after = [ "network.target" ];
       wantedBy = [ "multi-user.target" ];
 
-      path = with pkgs; [ openssl ];
+      path = with pkgs; [ openssl cacert ];
 
       environment = {
         HOST = cfg.host;
         PORT = toString cfg.port;
+        # SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
       };
 
       serviceConfig = {
