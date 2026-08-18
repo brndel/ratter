@@ -46,6 +46,7 @@ in
         HOST = cfg.host;
         PORT = toString cfg.port;
         SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+        RUST_BACKTRACE = "full";
       };
 
       serviceConfig = {
