@@ -37,6 +37,17 @@
           }
       );
 
-      nixosModules.default = ./default.nix;
+      nixosModules.default = { config, lib, ... }:
+        let
+          pkgs = import nixpkgs {
+            system = "x86_64-linux";
+            overlays = [
+              rust-overlay.overlays.default
+            ];
+          };
+        in
+        import ./. {
+          inherit pkgs lib config;
+        };
     };
 }
