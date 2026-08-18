@@ -3,7 +3,7 @@ use crate::id::{DeviceId, EndpointId};
 use super::clusters::*;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct EndpointTarget {
     pub device: DeviceId,
     pub endpoint: EndpointId,

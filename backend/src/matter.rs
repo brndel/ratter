@@ -1,29 +1,32 @@
-use std::{collections::BTreeMap, path::Path, sync::Arc};
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
-use anyhow::Result;
-use dioxus::logger::tracing::{error, info};
+use anyhow::{Result, anyhow};
+use dioxus::logger::tracing::info;
 use futures::Stream;
-use matc::devman::{DeviceManager, ManagerConfig};
-use rand::{
-    Rng,
-    rngs::{SysRng, ThreadRng},
+use matc::{
+    NetworkCreds,
+    devman::{DeviceManager, ManagerConfig},
 };
-use tokio::sync::RwLock;
+use rand::{Rng, rngs::ThreadRng};
+use tokio::{fs, sync::RwLock, time::interval};
 
 use shared_core::{
-    asset::{asset_registry::AssetRegistry, scene::Scene},
+    asset::{
+        asset_registry::AssetRegistry,
+        device::{DeviceAsset, DeviceAssetConfig},
+        scene::SceneInRoom,
+    },
     attr_dump::AttrDump,
     backend::RunAction,
     device::{
-        EndpointAction, EndpointTarget, device_controls::LightControl,
+        DeviceCommissionMode, EndpointAction, EndpointTarget, device_controls::LightControl,
         device_registry::DeviceRegistry,
     },
-    event::Event,
+    id::AssetId,
 };
 
 use crate::{
     asset::AssetWatcher,
-    automation_action_runner::AutomationActionRunner,
     connections::Connections,
     controls::Controls,
     event_bus::{EventBus, EventBusListener},
@@ -41,6 +44,7 @@ struct MatterManagerInner {
     controls: Arc<RwLock<Controls>>,
     event_bus: EventBus,
     connections: Connections,
+    thread_dataset: RwLock<Option<Vec<u8>>>,
 }
 
 impl MatterManager {
@@ -73,14 +77,21 @@ impl MatterManager {
     pub async fn reconnect_device(&self, device_id: u64) -> Result<()> {
         self.0
             .connections
-            .reconnect_device(&self.0.device_manager, device_id)
-            .await
+            .connect_to_device(self.0.device_manager.clone(), device_id, true)
+            .await;
+
+        Ok(())
     }
 
-    pub async fn commission_device(&self, pairing_code: &str, device_name: &str) -> Result<u64> {
+    pub async fn commission_device(
+        &self,
+        pairing_code: &str,
+        device_asset: DeviceAssetConfig,
+        mode: DeviceCommissionMode,
+    ) -> Result<u64> {
         self.0
             .clone()
-            .commission_device(pairing_code, device_name)
+            .commission_device(pairing_code, device_asset, mode)
             .await
     }
 
@@ -116,20 +127,25 @@ impl MatterManager {
         self.0.asset_registry.read().await.clone()
     }
 
-    pub async fn enable_scene(&self, name: &str) -> anyhow::Result<()> {
+    pub async fn enable_scene(&self, scene_id: SceneInRoom) -> anyhow::Result<()> {
         let mut controls = self.0.controls.write().await;
 
-        controls.enable_scene(name).await;
+        controls.enable_scene(scene_id).await;
 
         Ok(())
     }
 
-    pub async fn disable_scene(&self, name: &str) -> anyhow::Result<()> {
+    pub async fn disable_scene(&self, scene_id: SceneInRoom) -> anyhow::Result<()> {
         let mut controls = self.0.controls.write().await;
 
-        controls.disable_scene(name).await;
+        controls.disable_scene(scene_id).await;
 
         Ok(())
+    }
+
+    pub async fn get_active_scenes(&self) -> BTreeMap<AssetId, Vec<SceneInRoom>> {
+        let controls = self.0.controls.read().await;
+        controls.active_scenes()
     }
 }
 
@@ -142,72 +158,63 @@ impl MatterManagerInner {
         let device_registry = Arc::new(RwLock::new(DeviceRegistry::new()));
         let asset_registry = Arc::new(RwLock::new(AssetRegistry::new()));
 
-        let connections = Connections::new(event_bus.sender());
+        let connections = Connections::new(event_bus.sender(), asset_registry.clone());
 
         let device_controls = Arc::new(RwLock::new(Controls::new(
             connections.clone(),
             ReadOnlyArc::new(asset_registry.clone()),
             ReadOnlyArc::new(device_registry.clone()),
+            event_bus.sender(),
         )));
 
         tokio::spawn({
-            let connections = connections.clone();
-            let controls = device_controls.clone();
+            event_bus.listen().pass_events(
+                device_registry.clone(),
+                asset_registry.clone(),
+                device_controls.clone(),
+            )
+        });
 
-            let assets = ReadOnlyArc::new(asset_registry.clone());
-            let mut listener = event_bus.listen();
+        let mut reconnect_interval = interval(Duration::from_secs(5 * 60)); // Try reconnecting every 5 minutes
+
+        tokio::spawn({
+            let connections = connections.clone();
+            let device_manager = device_manager.clone();
 
             async move {
                 loop {
-                    let result = listener.next().await;
-                    match result {
-                        Ok(event) => {
-                            let assets = assets.read().await;
+                    let _ = reconnect_interval.tick().await;
+                    info!("Connecting to all non-connected devices");
 
-                            // for automation in assets.automations.assets_iter() {
-                            //     if automation.is_triggered_by(&event) {
-                            //         if let Err(err) = automation
-                            //             .perform_action(&mut AutomationActionRunner {
-                            //                 connections: connections.clone(),
-                            //                 controls: controls.clone(),
-                            //             })
-                            //             .await
-                            //         {
-                            //             error!("Error while handling automation {}", err);
-                            //         }
-                            //     }
-                            // }
-                        }
-                        Err(err) => {
-                            error!("Error in automation passing handler: {err}");
-                            break;
-                        }
+                    for device in device_manager.list_devices().unwrap() {
+                        tokio::spawn({
+                            let device_manager = device_manager.clone();
+                            let connections = connections.clone();
+
+                            async move {
+                                if connections
+                                    .connect_to_device(device_manager, device.node_id, false)
+                                    .await
+                                {
+                                    info!("Connecting to device {}", device.node_id)
+                                }
+                            }
+                        });
                     }
                 }
             }
         });
 
-        tokio::spawn({
-            event_bus
-                .listen()
-                .pass_events(device_registry.clone(), asset_registry.clone())
-        });
-
-        for device in device_manager.list_devices()? {
-            tokio::spawn({
-                let device_manager = device_manager.clone();
-                let connections = connections.clone();
-
-                async move {
-                    connections
-                        .connect_to_device(&device_manager, device.node_id)
-                        .await
-                        .unwrap();
-                }
-            });
-        }
-
         let asset_watcher = Arc::new(AssetWatcher::new(event_bus.sender()).watch_all()?);
+
+        let thread_dataset = {
+            let dataset = fs::read_to_string("data/thread_dataset")
+                .await
+                .ok()
+                .and_then(|data| hex::decode(data).ok());
+
+            RwLock::new(dataset)
+        };
 
         Ok(Self {
             device_manager,
@@ -217,6 +224,7 @@ impl MatterManagerInner {
             controls: device_controls,
             event_bus,
             connections,
+            thread_dataset,
         })
     }
 
@@ -250,7 +258,8 @@ impl MatterManagerInner {
     async fn commission_device(
         self: Arc<Self>,
         pairing_code: &str,
-        device_name: &str,
+        device_asset: DeviceAssetConfig,
+        mode: DeviceCommissionMode,
     ) -> Result<u64> {
         let node_id = {
             let mut rand = ThreadRng::default();
@@ -266,21 +275,52 @@ impl MatterManagerInner {
 
         info!(
             "Starting commission for device {} (node {})",
-            device_name, node_id
+            device_asset.name, node_id
         );
 
-        let connection = self
-            .device_manager
-            .commission_with_code(pairing_code, node_id, device_name)
-            .await?;
+        let connection = match mode {
+            DeviceCommissionMode::Ble => {
+                let thread_dataset = self
+                    .thread_dataset
+                    .read()
+                    .await
+                    .clone()
+                    .ok_or_else(|| anyhow!("thread dataset not initialized"))?;
+
+                self.device_manager
+                    .commission_ble_with_code(
+                        pairing_code,
+                        node_id,
+                        &node_id.to_string(),
+                        NetworkCreds::Thread {
+                            dataset: thread_dataset,
+                        },
+                    )
+                    .await?
+            }
+            DeviceCommissionMode::SharedCode => {
+                self.device_manager
+                    .commission_with_code(pairing_code, node_id, &node_id.to_string())
+                    .await?
+            }
+        };
+
+        {
+            let mut assets = self.asset_registry.write().await;
+            assets
+                .set_asset(
+                    node_id,
+                    DeviceAsset {
+                        config: device_asset,
+                        endpoints: BTreeMap::new(),
+                    },
+                )
+                .await?;
+        }
 
         tokio::spawn({
-            let device_name = device_name.to_owned();
-
             async move {
-                self.connections
-                    .init_connection(connection, node_id, device_name)
-                    .await;
+                self.connections.add_connection(connection, node_id).await;
             }
         });
 

@@ -23,6 +23,7 @@ pub enum DeviceInitStatus {
     Initializing,
     StartingListeners,
     Connected(Device),
+    Disconnected,
     Error(String),
 }
 

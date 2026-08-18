@@ -7,6 +7,7 @@ mod level_control;
 mod names;
 mod occupancy_sensing;
 mod on_off;
+mod power_source;
 
 use std::ops::Deref;
 
@@ -19,14 +20,16 @@ pub use level_control::*;
 pub use names::get_cluster_name;
 pub use occupancy_sensing::*;
 pub use on_off::*;
+pub use power_source::*;
 use serde::{Deserialize, Serialize};
 
-use crate::{device::attr_change::AttrChange, event::AttrChangeSource};
+use crate::{device::attr_change::AttrChange, event::AttrChangeSource, id::ClusterId};
 
 #[derive(
     Debug, Clone, Default, Serialize, Deserialize, Store, derive_more::AsRef, derive_more::AsMut,
 )]
 pub struct Clusters {
+    pub power_scoure: Option<PowerSource>,
     pub on_off: Option<OnOff>,
     pub level_control: Option<LevelControl>,
     pub color_control: Option<ColorControl>,
@@ -34,14 +37,22 @@ pub struct Clusters {
     pub identify: Option<Identify>,
     pub electrical_power_measurement: Option<ElectricalPowerMeasurement>,
     pub electrical_energy_measurement: Option<ElectricalEnergyMeasurement>,
-    pub other: Vec<u32>,
+    pub cluster_ids: Vec<ClustersClusterId>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct ClustersClusterId {
+    pub id: ClusterId,
+    pub is_handled: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeviceValue<T> {
     device_value: T,
     user_value: Option<T>,
 }
+
+impl<T: Copy> Copy for DeviceValue<T> {}
 
 impl<T> DeviceValue<T> {
     pub fn new(device_value: T) -> Self {
@@ -116,6 +127,11 @@ impl Clusters {
                     change.apply(state, source)
                 }
             }
+            AttrChange::PowerSource(change) => {
+                if let Some(state) = self.as_mut() {
+                    change.apply(state, source)
+                }
+            }
         }
     }
 }
@@ -136,7 +152,12 @@ mod impl_from_endpoint {
             let mut result = Self::default();
 
             for cluster in clusters {
+                let mut is_handled = true;
                 match cluster {
+                    PowerSource::CLUSTER_ID => {
+                        let target = <Clusters as AsMut<Option<PowerSource>>>::as_mut(&mut result);
+                        *target = Some(PowerSource::from_endpoint(connection, endpoint).await?)
+                    }
                     OnOff::CLUSTER_ID => {
                         result.on_off = Some(OnOff::from_endpoint(connection, endpoint).await?)
                     }
@@ -160,10 +181,20 @@ mod impl_from_endpoint {
                             ElectricalPowerMeasurement::from_endpoint(connection, endpoint).await?,
                         )
                     }
-                    cluster => {
-                        result.other.push(cluster);
+                    ElectricalEnergyMeasurement::CLUSTER_ID => {
+                        result.electrical_energy_measurement = Some(
+                            ElectricalEnergyMeasurement::from_endpoint(connection, endpoint)
+                                .await?,
+                        )
+                    }
+                    _ => {
+                        is_handled = false;
                     }
                 }
+                result.cluster_ids.push(ClustersClusterId {
+                    id: cluster,
+                    is_handled,
+                });
             }
 
             Ok(result)

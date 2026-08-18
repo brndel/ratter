@@ -1,19 +1,23 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
+use crate::asset::asset_registry::AssetRegistry;
+use crate::asset::selector::EndpointSelector;
 use crate::device::EndpointTarget;
-use crate::{
-    device::device_controls::LightControl,
-    id::{DeviceId, EndpointId},
-};
+use crate::id::AssetId;
+use crate::{device::device_controls::LightControl, id::DeviceId};
+use dioxus::logger::tracing::info;
 use serde::{Deserialize, Serialize};
+
+use super::device::DeviceAssetDeviceKind;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Scene {
-    pub layer: String,
     pub name: String,
-    pub split_by_room: bool,
+    pub layer: AssetId,
+    pub color: u64,
+
     #[serde(rename = "setting")]
-    pub settings: BTreeMap<DeviceId, SceneSetting>,
+    pub settings: Vec<SceneSetting>,
 }
 
 #[cfg(feature = "backend")]
@@ -23,69 +27,90 @@ impl crate::backend::DirectoryAsset for Scene {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SceneSetting {
-    #[serde(rename = "endpoint")]
-    pub endpoints: BTreeMap<EndpointId, LightControl>,
+    pub target: EndpointSelector,
+    pub control: LightControl,
 }
 
-#[cfg(feature = "backend")]
-impl crate::backend::DiffAction for Scene {
-    type Diff = BTreeSet<EndpointTarget>;
+#[derive(Debug, Clone)]
+pub struct ComputedSceneSettings {
+    settings: BTreeMap<EndpointTarget, LightControl>,
+}
 
-    fn diff_action(old: Option<&Self>, new: Option<&Self>) -> Self::Diff {
-        match (old, new) {
-            (None, None) => Default::default(),
-            (None, Some(new)) => device_endpoint_iter(&new.settings).collect(),
-            (Some(old), None) => device_endpoint_iter(&old.settings).collect(),
-            (Some(old), Some(new)) => device_endpoint_iter(&new.settings)
-                .chain(device_endpoint_iter(&old.settings))
-                .collect(),
+impl ComputedSceneSettings {
+    pub fn new(scene: &Scene, assets: &AssetRegistry) -> Self {
+        let mut result = BTreeMap::<EndpointTarget, LightControl>::new();
+
+        let mut settings = scene.settings.clone();
+        settings.sort_by_key(|setting| setting.target.clone());
+
+        for setting in settings {
+            info!("setting on target {:?}", setting.target);
+            let device_type = DeviceAssetDeviceKind::ColorLight;
+            let Some(endpoints) = setting.target.get_endpoints(Some(device_type), assets) else {
+                continue;
+            };
+
+            for endpoint in endpoints {
+                info!("endpoint target: {:?}", endpoint);
+                result.insert(endpoint, setting.control.clone());
+            }
         }
+
+        Self { settings: result }
+    }
+
+    pub fn endpoints(&self) -> impl Iterator<Item = &EndpointTarget> {
+        self.settings.keys()
+    }
+
+    pub fn get_control(&self, target: EndpointTarget) -> Option<&LightControl> {
+        self.settings.get(&target)
     }
 }
 
-fn device_endpoint_iter(
-    map: &BTreeMap<DeviceId, SceneSetting>,
-) -> impl Iterator<Item = EndpointTarget> {
-    map.iter().flat_map(|(&device, setting)| {
-        setting
-            .endpoints
-            .keys()
-            .map(move |&endpoint| EndpointTarget { device, endpoint })
-    })
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Hash)]
+pub struct SceneInRoom {
+    pub scene: AssetId,
+    pub room: Option<AssetId>,
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::device::device_controls::LightControlColor;
+impl SceneInRoom {
+    pub fn affects_device(&self, device: DeviceId, assets: &AssetRegistry) -> bool {
+        self.room.is_none_or(|scene_room| {
+            let device_room = assets.get_room_of_device(device);
 
-    use super::*;
+            device_room.is_some_and(|device_room| device_room == scene_room)
+        })
+    }
 
-    #[test]
-    fn serialize() {
-        let scene = Scene {
-            layer: "thingy".to_owned(),
-            name: "test scene".to_owned(),
-            split_by_room: false,
-            settings: BTreeMap::from_iter([(
-                3,
-                SceneSetting {
-                    endpoints: BTreeMap::from_iter([(
-                        1,
-                        LightControl {
-                            is_on: true,
-                            level: 254,
-                            color: LightControlColor::HueSaturation {
-                                hue: 0,
-                                saturation: 0,
-                            },
-                        },
-                    )]),
-                },
-            )]),
-        };
+    pub fn get_affected_endpoints<'a>(
+        &self,
+        assets: &'a AssetRegistry,
+    ) -> impl Iterator<Item = &'a EndpointTarget> {
+        if let Some(settings) = assets.get_computed_scene_settings(self.scene) {
+            Some(
+                settings
+                    .endpoints()
+                    .filter(move |endpoint| self.affects_device(endpoint.device, assets)),
+            )
+            .into_iter()
+            .flatten()
+        } else {
+            None.into_iter().flatten()
+        }
+    }
 
-        let serialzed = toml::to_string_pretty(&scene).unwrap();
+    pub fn get_control<'a>(
+        &self,
+        target: EndpointTarget,
+        assets: &'a AssetRegistry,
+    ) -> Option<&'a LightControl> {
+        if !self.affects_device(target.device, assets) {
+            return None;
+        }
 
-        println!("{serialzed}")
+        let settings = assets.get_computed_scene_settings(self.scene)?;
+
+        settings.get_control(target)
     }
 }

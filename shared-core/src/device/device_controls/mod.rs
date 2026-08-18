@@ -1,7 +1,13 @@
-mod light_control;
 mod controls;
+mod electrical_sensor;
+mod light_control;
+mod occupancy_sensor;
+mod power_source;
 mod root_node;
 
-pub use light_control::*;
-pub use root_node::*;
 pub use controls::*;
+pub use electrical_sensor::*;
+pub use light_control::*;
+pub use occupancy_sensor::*;
+pub use power_source::*;
+pub use root_node::*;

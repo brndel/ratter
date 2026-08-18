@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, derive_more::From)]
 pub enum AttrChange {
+    PowerSource(PowerSourceChange),
     OnOff(OnOffChange),
     LevelControl(LevelControlChange),
     ColorControl(ColorControlChange),
@@ -24,6 +25,9 @@ mod impl_from_attr {
             value: &matc::tlv::TlvItemValue,
         ) -> anyhow::Result<Self> {
             let change = match cluster {
+                <PowerSourceChange as ChangeEvent>::State::CLUSTER_ID => {
+                    PowerSourceChange::from_attr_change(attr, value)?.into()
+                }
                 <OnOffChange as ChangeEvent>::State::CLUSTER_ID => {
                     OnOffChange::from_attr_change(attr, value)?.into()
                 }

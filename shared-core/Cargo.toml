@@ -10,11 +10,13 @@ dioxus-stores.workspace = true
 serde = { workspace = true, features = ["rc"]}
 anyhow.workspace = true
 futures.workspace = true
+either_of.workspace = true
 
 derive_more = { workspace = true, features = ["as_ref"] }
 toml.workspace = true
 
 matc = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
 
 [features]
-backend = [ "dep:matc" ]
+backend = [ "dep:matc", "dep:tokio" ]

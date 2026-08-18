@@ -18,12 +18,12 @@ struct PopoverCtx {
 }
 
 #[component]
-pub fn PopoverButton(children: Element) -> Element {
+pub fn PopoverButton(children: Element, #[props(default)] hide_button: bool) -> Element {
     let ctx = try_use_context::<PopoverCtx>();
 
     if let Some(ctx) = ctx {
         rsx! {
-            button { popovertarget: "popover-{ctx.id}", class: "popover-button", {children} }
+            button { popovertarget: "popover-{ctx.id}", class: "popover-button", class: if hide_button { "hidden-button" }, {children} }
         }
     } else {
         rsx! { "No ctx" }

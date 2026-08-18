@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SceneLayer {
+    pub name: String,
     pub priority: u32,
     pub behaviour: SceneLayerBehaviour,
 }
@@ -12,8 +13,10 @@ impl crate::backend::DirectoryAsset for SceneLayer {
 }
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum SceneLayerBehaviour {
     #[default]
-    Replace,
+    One,
+    OnePerRoom,
     Stack,
 }

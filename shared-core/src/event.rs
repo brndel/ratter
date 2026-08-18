@@ -3,17 +3,31 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     asset::{
-        automation::Automation, device::DeviceAsset, room::Room, scene::Scene,
+        automation::{Automation, SceneTarget},
+        device::DeviceAsset,
+        label::Label,
+        room::Room,
+        scene::Scene,
         scene_layer::SceneLayer,
     },
     device::{AttrChange, ClusterEvent, device_registry::DeviceInitStatus},
-    id::EndpointId,
+    id::{AssetId, DeviceId, EndpointId},
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Event {
-    Device { device: u64, event: DeviceEvent },
-    Asset { asset: String, event: AssetEvent },
+    Device {
+        device: DeviceId,
+        event: DeviceEvent,
+    },
+    Asset {
+        asset: AssetId,
+        event: AssetEvent,
+    },
+    SceneStack {
+        layer: AssetId,
+        active_scenes: Vec<SceneTarget>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, derive_more::From)]
@@ -46,6 +60,7 @@ pub struct ActionEvent {
 pub enum AssetEvent {
     Device(AssetEventAction<DeviceAsset>),
     Room(AssetEventAction<Room>),
+    Label(AssetEventAction<Label>),
     Scene(AssetEventAction<Scene>),
     SceneLayer(AssetEventAction<SceneLayer>),
     Automation(AssetEventAction<Automation>),

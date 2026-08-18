@@ -20,16 +20,18 @@ anyhow = "1.0"
 futures = "0.3"
 derive_more = "2.1"
 
-matc = "0.1.3"
+matc = { version = "0.1.3", features = ["ble"] }
 notify = "8.2.0"
 tokio = "1.53"
 tokio-util = "0.7.19"
 tokio-stream = "0.1.19"
+hex = "0.4.3"
 
 toml = "1.1.3+spec-1.1.0"
 chrono = "0.4"
 rand = "0.10.2"
-
+either_of = "0.1.9"
+itertools = "0.15"
 
 getrandom_0_2_17 = { package = "getrandom", version = "0.2.17" }
 getrandom_0_3_4 = { package = "getrandom", version = "0.3.4" }

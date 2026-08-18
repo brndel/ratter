@@ -4,18 +4,23 @@ use dioxus::logger::tracing::error;
 use shared_core::{
     asset::{
         asset_registry::AssetRegistry,
-        automation::{SceneAction, SceneActionAction, SceneTarget},
+        automation::{SceneAction, SceneTarget},
+        scene::SceneInRoom,
     },
     backend::{ControlActions, RunAction},
     device::{
-        EndpointTarget,
+        EndpointAction, EndpointTarget,
         device_controls::{LightControl, LightControlClusters},
         device_registry::DeviceRegistry,
     },
+    id::AssetId,
 };
 use tokio::spawn;
 
-use crate::{connections::Connections, controls::SceneStack, read_only::ReadOnlyArc};
+use crate::{
+    connections::Connections, controls::SceneStack, event_bus::EventBusSender,
+    read_only::ReadOnlyArc,
+};
 
 pub struct Controls {
     user_controls: BTreeMap<EndpointTarget, LightControl>,
@@ -27,12 +32,13 @@ pub struct Controls {
 impl Controls {
     pub fn new(
         connections: Connections,
-        assets: ReadOnlyArc<AssetRegistry>,
+        asset_registry: ReadOnlyArc<AssetRegistry>,
         device_registry: ReadOnlyArc<DeviceRegistry>,
+        bus: EventBusSender,
     ) -> Self {
         Self {
             user_controls: Default::default(),
-            scene_stack: SceneStack::new(assets),
+            scene_stack: SceneStack::new(asset_registry.clone(), bus),
             device_registry,
             connections,
         }
@@ -50,44 +56,53 @@ impl Controls {
         Ok(())
     }
 
-    pub async fn enable_scene(&mut self, name: &str) {
+    pub async fn enable_scene(&mut self, scene_id: SceneInRoom) {
         let affected_endpoints = self
             .scene_stack
-            .get_devices_affected_by_scene_change(name)
+            .get_endpoints_affected_by_scene_change(scene_id)
             .await;
 
         for device in &affected_endpoints {
             self.user_controls.remove(device);
         }
 
-        self.scene_stack.enable_scene(name).await;
+        self.scene_stack.enable_scene(scene_id).await;
 
         self.update_endpoints(affected_endpoints).await;
     }
 
-    pub async fn disable_scene(&mut self, name: &str) {
+    pub async fn disable_scene(&mut self, scene_id: SceneInRoom) {
         let affected_endpoints = self
             .scene_stack
-            .get_devices_affected_by_scene_change(name)
+            .get_endpoints_affected_by_scene_change(scene_id)
             .await;
 
-        self.scene_stack.disable_scene(name).await;
+        self.scene_stack.disable_scene(scene_id).await;
 
         self.update_endpoints(affected_endpoints).await;
     }
 
-    pub async fn is_scene_enabled(&self, name: &str) -> bool {
+    pub fn active_scenes(&self) -> BTreeMap<AssetId, Vec<SceneInRoom>> {
+        self.scene_stack.active_scenes()
+    }
+
+    pub async fn is_scene_enabled(&self, scene_id: SceneInRoom) -> bool {
         self.scene_stack
-            .is_scene_enabled(name)
+            .is_scene_enabled(scene_id)
             .await
             .unwrap_or(false)
+    }
+
+    pub async fn reset_scene_stack(&mut self) {
+        let affected_endpoints = self.scene_stack.clear().await;
+        self.update_endpoints(affected_endpoints).await;
     }
 
     async fn update_endpoints(&self, endpoints: impl IntoIterator<Item = EndpointTarget>) {
         let devices = self.device_registry.read().await;
 
         for endpoint in endpoints {
-            let controls = self.get_controls(&endpoint);
+            let controls = self.get_controls(endpoint).await;
 
             let Some(clusters) = devices.get_cluster(endpoint) else {
                 continue;
@@ -97,7 +112,7 @@ impl Controls {
                 continue;
             };
 
-            let actions = LightControl::actions(&control_clusters, controls);
+            let actions = LightControl::actions(&control_clusters, controls.as_ref());
 
             spawn({
                 let mut connections = self.connections.clone();
@@ -112,12 +127,12 @@ impl Controls {
 }
 
 impl Controls {
-    fn get_controls(&self, target: &EndpointTarget) -> Option<&LightControl> {
-        if let Some(control) = self.user_controls.get(target) {
-            return Some(control);
+    async fn get_controls(&self, target: EndpointTarget) -> Option<LightControl> {
+        if let Some(control) = self.user_controls.get(&target) {
+            return Some(control.clone());
         }
 
-        self.scene_stack.get_device_controls(target)
+        self.scene_stack.get_controls(target).await
     }
 }
 
@@ -128,19 +143,33 @@ impl RunAction<SceneTarget, SceneAction> for Controls {
         actions: I,
     ) -> anyhow::Result<()> {
         for action in actions {
-            match action.action {
-                SceneActionAction::Enable => self.enable_scene(&target.name).await,
-                SceneActionAction::Disable => self.disable_scene(&target.name).await,
-                SceneActionAction::Toggle => {
-                    if self.is_scene_enabled(&target.name).await {
-                        self.disable_scene(&target.name).await
+            match action {
+                SceneAction::Enable => self.enable_scene(target).await,
+                SceneAction::Disable => self.disable_scene(target).await,
+                SceneAction::Toggle => {
+                    if self.is_scene_enabled(target).await {
+                        self.disable_scene(target).await
                     } else {
-                        self.enable_scene(&target.name).await
+                        self.enable_scene(target).await
                     }
                 }
             }
         }
 
         Ok(())
+    }
+}
+
+impl RunAction<EndpointTarget, EndpointAction> for Controls {
+    async fn run_actions<I: IntoIterator<Item = EndpointAction>>(
+        &mut self,
+        target: EndpointTarget,
+        actions: I,
+    ) -> anyhow::Result<()>
+    where
+        I::IntoIter: Send + Sync,
+        I: 'static + Send + Sync,
+    {
+        self.connections.run_actions(target, actions).await
     }
 }

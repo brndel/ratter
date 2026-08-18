@@ -2,18 +2,300 @@ use serde::{Deserialize, Serialize};
 
 use crate::device::clusters::{ChangeEvent, define_cluster_macro::define_cluster};
 
-define_cluster!(
-struct ColorControl, enum ColorControlChange, color_control, CLUSTER_ID_COLOR_CONTROL {
-    current_hue: u8 => CLUSTER_COLOR_CONTROL_ATTR_ID_CURRENTHUE as SetCurrentHue { read_current_hue, decode_current_hue },
-    current_saturation: u8 => CLUSTER_COLOR_CONTROL_ATTR_ID_CURRENTSATURATION as SetCurrentSaturation { read_current_saturation, decode_current_saturation },
-    current_x: u16 => CLUSTER_COLOR_CONTROL_ATTR_ID_CURRENTX as SetCurrentX { read_current_x, decode_current_x },
-    current_y: u16 => CLUSTER_COLOR_CONTROL_ATTR_ID_CURRENTY as SetCurrentY { read_current_y, decode_current_y },
-    color_temperature_mireds: u16 => CLUSTER_COLOR_CONTROL_ATTR_ID_COLORTEMPERATUREMIREDS as SetColorTemperatureMireds { read_color_temperature_mireds, decode_color_temperature_mireds },
-    color_temperature_mireds_min: u16 => CLUSTER_COLOR_CONTROL_ATTR_ID_COLORTEMPPHYSICALMINMIREDS as SetColorTemperatureMiredsMin { read_color_temp_physical_min_mireds, decode_color_temp_physical_min_mireds },
-    color_temperature_mireds_max: u16 => CLUSTER_COLOR_CONTROL_ATTR_ID_COLORTEMPPHYSICALMAXMIREDS as SetColorTemperatureMiredsMax { read_color_temp_physical_max_mireds, decode_color_temp_physical_max_mireds },
-    color_mode: ColorControlMode => CLUSTER_COLOR_CONTROL_ATTR_ID_COLORMODE as SetColorMode { read_color_mode, decode_color_mode }
+// define_cluster!(
+// struct ColorControl, enum ColorControlChange, color_control, CLUSTER_ID_COLOR_CONTROL {
+//     current_hue: u8 => CLUSTER_COLOR_CONTROL_ATTR_ID_CURRENTHUE as SetCurrentHue { read_current_hue, decode_current_hue },
+//     current_saturation: u8 => CLUSTER_COLOR_CONTROL_ATTR_ID_CURRENTSATURATION as SetCurrentSaturation { read_current_saturation, decode_current_saturation },
+//     current_x: u16 => CLUSTER_COLOR_CONTROL_ATTR_ID_CURRENTX as SetCurrentX { read_current_x, decode_current_x },
+//     current_y: u16 => CLUSTER_COLOR_CONTROL_ATTR_ID_CURRENTY as SetCurrentY { read_current_y, decode_current_y },
+//     color_temperature_mireds: u16 => CLUSTER_COLOR_CONTROL_ATTR_ID_COLORTEMPERATUREMIREDS as SetColorTemperatureMireds { read_color_temperature_mireds, decode_color_temperature_mireds },
+//     color_temperature_mireds_min: u16 => CLUSTER_COLOR_CONTROL_ATTR_ID_COLORTEMPPHYSICALMINMIREDS as SetColorTemperatureMiredsMin { read_color_temp_physical_min_mireds, decode_color_temp_physical_min_mireds },
+//     color_temperature_mireds_max: u16 => CLUSTER_COLOR_CONTROL_ATTR_ID_COLORTEMPPHYSICALMAXMIREDS as SetColorTemperatureMiredsMax { read_color_temp_physical_max_mireds, decode_color_temp_physical_max_mireds },
+//     color_mode: ColorControlMode => CLUSTER_COLOR_CONTROL_ATTR_ID_COLORMODE as SetColorMode { read_color_mode, decode_color_mode }
+// }
+// );
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct ColorControl {
+    pub features: u8,
+    pub hue_saturation: Option<ColorControlFeatureHueSat>,
+    pub temperature: Option<ColorControlFeatureTemperature>,
+    pub xy: Option<ColorControlFeatureXy>,
+    pub color_mode: crate::device::clusters::DeviceValue<ColorControlMode>,
 }
-);
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct ColorControlFeatureHueSat {
+    pub current_hue: crate::device::clusters::DeviceValue<u8>,
+    pub current_saturation: crate::device::clusters::DeviceValue<u8>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct ColorControlFeatureTemperature {
+    pub color_temperature_mireds: crate::device::clusters::DeviceValue<u16>,
+    pub color_temperature_mireds_min: crate::device::clusters::DeviceValue<u16>,
+    pub color_temperature_mireds_max: crate::device::clusters::DeviceValue<u16>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct ColorControlFeatureXy {
+    pub current_x: crate::device::clusters::DeviceValue<u16>,
+    pub current_y: crate::device::clusters::DeviceValue<u16>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum ColorControlChange {
+    SetCurrentHue { current_hue: u8 },
+    SetCurrentSaturation { current_saturation: u8 },
+    SetCurrentX { current_x: u16 },
+    SetCurrentY { current_y: u16 },
+    SetColorTemperatureMireds { color_temperature_mireds: u16 },
+    SetColorMode { color_mode: ColorControlMode },
+}
+impl ChangeEvent for ColorControlChange {
+    type State = ColorControl;
+    fn apply(self, state: &mut Self::State, source: crate::event::AttrChangeSource) {
+        match self {
+            Self::SetCurrentHue { current_hue } => {
+                let Some(value) = state
+                    .hue_saturation
+                    .as_mut()
+                    .map(|value| &mut value.current_hue)
+                else {
+                    return;
+                };
+                match source {
+                    crate::event::AttrChangeSource::Device => {
+                        value.device_value = current_hue;
+                        value.user_value = None;
+                    }
+                    crate::event::AttrChangeSource::User => value.user_value = Some(current_hue),
+                }
+            }
+            Self::SetCurrentSaturation { current_saturation } => {
+                let Some(value) = state
+                    .hue_saturation
+                    .as_mut()
+                    .map(|value| &mut value.current_saturation)
+                else {
+                    return;
+                };
+                match source {
+                    crate::event::AttrChangeSource::Device => {
+                        value.device_value = current_saturation;
+                        value.user_value = None;
+                    }
+                    crate::event::AttrChangeSource::User => {
+                        value.user_value = Some(current_saturation)
+                    }
+                }
+            }
+            Self::SetCurrentX { current_x } => {
+                let Some(value) = state.xy.as_mut().map(|value| &mut value.current_x) else {
+                    return;
+                };
+                match source {
+                    crate::event::AttrChangeSource::Device => {
+                        value.device_value = current_x;
+                        value.user_value = None;
+                    }
+                    crate::event::AttrChangeSource::User => value.user_value = Some(current_x),
+                }
+            }
+            Self::SetCurrentY { current_y } => {
+                let Some(value) = state.xy.as_mut().map(|value| &mut value.current_y) else {
+                    return;
+                };
+                match source {
+                    crate::event::AttrChangeSource::Device => {
+                        value.device_value = current_y;
+                        value.user_value = None;
+                    }
+                    crate::event::AttrChangeSource::User => value.user_value = Some(current_y),
+                }
+            }
+            Self::SetColorTemperatureMireds {
+                color_temperature_mireds,
+            } => {
+                let Some(value) = state
+                    .temperature
+                    .as_mut()
+                    .map(|value| &mut value.color_temperature_mireds)
+                else {
+                    return;
+                };
+                match source {
+                    crate::event::AttrChangeSource::Device => {
+                        value.device_value = color_temperature_mireds;
+                        value.user_value = None;
+                    }
+                    crate::event::AttrChangeSource::User => {
+                        value.user_value = Some(color_temperature_mireds)
+                    }
+                }
+            }
+            Self::SetColorMode { color_mode } => match source {
+                crate::event::AttrChangeSource::Device => {
+                    state.color_mode.device_value = color_mode;
+                    state.color_mode.user_value = None;
+                }
+                crate::event::AttrChangeSource::User => {
+                    state.color_mode.user_value = Some(color_mode)
+                }
+            },
+        }
+    }
+}
+#[cfg(feature = "backend")]
+mod backend_impl {
+    use matc::clusters::codec::color_control;
+
+    impl crate::backend::ClusterState for super::ColorControl {
+        const CLUSTER_ID: u32 = matc::clusters::defs::CLUSTER_ID_COLOR_CONTROL;
+    }
+    impl crate::backend::FromEndpoint for super::ColorControl {
+        async fn from_endpoint(
+            connection: &matc::controller::Connection,
+            endpoint: u16,
+        ) -> anyhow::Result<Self> {
+            let features = color_control::read_color_capabilities(connection, endpoint).await?;
+
+            Ok(Self {
+                features,
+                hue_saturation: if features & color_control::colorcapabilities::HUE_SATURATION != 0
+                {
+                    Some(
+                        super::ColorControlFeatureHueSat::from_endpoint(connection, endpoint)
+                            .await?,
+                    )
+                } else {
+                    None
+                },
+                temperature: if features & color_control::colorcapabilities::COLOR_TEMPERATURE != 0
+                {
+                    Some(
+                        super::ColorControlFeatureTemperature::from_endpoint(connection, endpoint)
+                            .await?,
+                    )
+                } else {
+                    None
+                },
+                xy: if features & color_control::colorcapabilities::XY != 0 {
+                    Some(super::ColorControlFeatureXy::from_endpoint(connection, endpoint).await?)
+                } else {
+                    None
+                },
+                color_mode: crate::device::clusters::DeviceValue::new(
+                    color_control::read_color_mode(connection, endpoint)
+                        .await?
+                        .into(),
+                ),
+            })
+        }
+    }
+
+    impl crate::backend::FromEndpoint for super::ColorControlFeatureHueSat {
+        async fn from_endpoint(
+            connection: &matc::controller::Connection,
+            endpoint: u16,
+        ) -> anyhow::Result<Self> {
+            Ok(Self {
+                current_hue: crate::device::clusters::DeviceValue::new(
+                    color_control::read_current_hue(connection, endpoint)
+                        .await?
+                        .into(),
+                ),
+                current_saturation: crate::device::clusters::DeviceValue::new(
+                    color_control::read_current_saturation(connection, endpoint)
+                        .await?
+                        .into(),
+                ),
+            })
+        }
+    }
+
+    impl crate::backend::FromEndpoint for super::ColorControlFeatureTemperature {
+        async fn from_endpoint(
+            connection: &matc::controller::Connection,
+            endpoint: u16,
+        ) -> anyhow::Result<Self> {
+            Ok(Self {
+                color_temperature_mireds: crate::device::clusters::DeviceValue::new(
+                    color_control::read_color_temperature_mireds(connection, endpoint)
+                        .await?
+                        .into(),
+                ),
+                color_temperature_mireds_min: crate::device::clusters::DeviceValue::new(
+                    color_control::read_color_temp_physical_min_mireds(connection, endpoint)
+                        .await?
+                        .into(),
+                ),
+                color_temperature_mireds_max: crate::device::clusters::DeviceValue::new(
+                    color_control::read_color_temp_physical_max_mireds(connection, endpoint)
+                        .await?
+                        .into(),
+                ),
+            })
+        }
+    }
+    impl crate::backend::FromEndpoint for super::ColorControlFeatureXy {
+        async fn from_endpoint(
+            connection: &matc::controller::Connection,
+            endpoint: u16,
+        ) -> anyhow::Result<Self> {
+            Ok(Self {
+                current_x: crate::device::clusters::DeviceValue::new(
+                    color_control::read_current_x(connection, endpoint)
+                        .await?
+                        .into(),
+                ),
+                current_y: crate::device::clusters::DeviceValue::new(
+                    color_control::read_current_y(connection, endpoint)
+                        .await?
+                        .into(),
+                ),
+            })
+        }
+    }
+
+    impl crate::backend::FromAttrChange for super::ColorControlChange {
+        fn from_attr_change(attr: u32, value: &matc::tlv::TlvItemValue) -> anyhow::Result<Self> {
+            let value = match attr {
+                matc::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_CURRENTHUE => {
+                    Self::SetCurrentHue {
+                        current_hue: color_control::decode_current_hue(value)?.into(),
+                    }
+                }
+                matc::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_CURRENTSATURATION => {
+                    Self::SetCurrentSaturation {
+                        current_saturation: color_control::decode_current_saturation(value)?.into(),
+                    }
+                }
+                matc::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_CURRENTX => Self::SetCurrentX {
+                    current_x: color_control::decode_current_x(value)?.into(),
+                },
+                matc::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_CURRENTY => Self::SetCurrentY {
+                    current_y: color_control::decode_current_y(value)?.into(),
+                },
+                matc::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_COLORTEMPERATUREMIREDS => {
+                    Self::SetColorTemperatureMireds {
+                        color_temperature_mireds: color_control::decode_color_temperature_mireds(
+                            value,
+                        )?
+                        .into(),
+                    }
+                }
+                matc::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_COLORMODE => {
+                    Self::SetColorMode {
+                        color_mode: color_control::decode_color_mode(value)?.into(),
+                    }
+                }
+                _ => return Err(anyhow::anyhow!("unkown attr")),
+            };
+            Ok(value)
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ColorControlMode {
@@ -135,14 +417,25 @@ impl ColorControl {
     pub fn css_color(&self, level: u8) -> String {
         match *self.color_mode {
             ColorControlMode::HueSaturation => {
-                let hue = *self.current_hue as u32 * 360 / 254;
-                let white = 100 - *self.current_saturation as u32 * 100 / 254;
-                let black = 100 - level as u32 * 100 / 254;
+                if let Some(hue_saturation) = &self.hue_saturation {
+                    let hue = *hue_saturation.current_hue as u32 * 360 / 254;
+                    let white = 100 - *hue_saturation.current_saturation as u32 * 100 / 254;
+                    let black = 100 - level as u32 * 100 / 254;
 
-                format!("hwb({} {}% {}%)", hue, white, black)
+                    format!("hwb({} {}% {}%)", hue, white, black)
+                } else {
+                    format!("purple")
+                }
             }
             ColorControlMode::Temperature => {
-                Self::temperature_mireds_to_css_color(*self.color_temperature_mireds, level)
+                if let Some(temperature) = &self.temperature {
+                    Self::temperature_mireds_to_css_color(
+                        *temperature.color_temperature_mireds,
+                        level,
+                    )
+                } else {
+                    format!("purple")
+                }
             }
             ColorControlMode::Xy => format!("#ff00ff"),
         }

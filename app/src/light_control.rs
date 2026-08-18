@@ -24,7 +24,7 @@ pub fn LightControlView(
     };
 
     let call_control_callback = move || {
-        on_control(LightControl::from_clusters(LightControlClusters {
+        on_control(LightControl::from(LightControlClusters {
             on_off: &on_off.read(),
             level_control: &level_control.read(),
             color_control: &color_control.read(),
@@ -72,62 +72,75 @@ pub fn LightControlView(
                         color_control.with_mut(|control| control.color_mode.set_user(value));
                         call_control_callback()
                     },
-                    TabBarItem { value: ColorControlMode::HueSaturation, "Hue/Sat" }
-                    TabBarItem { value: ColorControlMode::Temperature, "Temp" }
-                                // TabBarItem { value: ColorControlMode::Xy, "Xy" }
+                    if color_control().hue_saturation.is_some() {
+                        TabBarItem { value: ColorControlMode::HueSaturation, "Hue/Sat" }
+                    }
+                    if color_control().temperature.is_some() {
+                        TabBarItem { value: ColorControlMode::Temperature, "Temp" }
+                    }
+                    // TabBarItem { value: ColorControlMode::Xy, "Xy" }
                 }
 
                 match *color_control().color_mode {
                     ColorControlMode::HueSaturation => {
-                        rsx! {
+                        if let Some(hue_sat) = &color_control().hue_saturation {
+                            rsx! {
+                                input {
+                                    class: "hue-slider",
+                                    r#type: "range",
+                                    oninput: move |ev| {
+                                        if let Some(value) = ev.value().parse().ok() {
+                                            color_control.with_mut(|control| if let Some(hue_saturation) = &mut control.hue_saturation {hue_saturation.current_hue.set_user(value)})
+                                        }
+                                    },
+                                    min: 0,
+                                    max: 254,
+                                    onmouseup: move |_| { call_control_callback() },
+                                    value: "{*hue_sat.current_hue}",
+                                }
 
-                            input {
-                                class: "hue-slider",
-                                r#type: "range",
-                                oninput: move |ev| {
-                                    if let Some(value) = ev.value().parse().ok() {
-                                        color_control.with_mut(|control| control.current_hue.set_user(value))
-                                    }
-                                },
-                                min: 0,
-                                max: 254,
-                                onmouseup: move |_| { call_control_callback() },
-                                value: "{*color_control().current_hue}",
+                                input {
+                                    class: "saturation-slider",
+                                    r#type: "range",
+                                    oninput: move |ev| {
+                                        if let Some(value) = ev.value().parse().ok() {
+                                            color_control.with_mut(|control| if let Some(hue_saturation) = &mut control.hue_saturation {hue_saturation.current_saturation.set_user(value)})
+                                        }
+                                    },
+                                    min: 0,
+                                    max: 254,
+                                    onmouseup: move |_| { call_control_callback() },
+                                    value: "{*hue_sat.current_saturation}",
+                                }
                             }
-
-                            input {
-                                class: "saturation-slider",
-                                r#type: "range",
-                                oninput: move |ev| {
-                                    if let Some(value) = ev.value().parse().ok() {
-                                        color_control.with_mut(|control| control.current_saturation.set_user(value))
-                                    }
-                                },
-                                min: 0,
-                                max: 254,
-                                onmouseup: move |_| { call_control_callback() },
-                                value: "{*color_control().current_saturation}",
-                            }
+                        } else {
+                            rsx! {}
                         }
                     }
-                    ColorControlMode::Temperature => rsx! {
-                        "Temp"
+                    ColorControlMode::Temperature => {
+                        if let Some(hue_sat) = &color_control().temperature {
+                            rsx! {
+                                "Temp"
 
-                        input {
-                            class: "temperature-slider",
-                            style: "background: linear-gradient(to right in hsl, {
-                                                            ColorControl::temperature_mireds_to_css_color(*color_control().color_temperature_mireds_min, 255)}, {
-                                                            ColorControl::temperature_mireds_to_css_color(*color_control().color_temperature_mireds_max, 255)})",
-                            r#type: "range",
-                            oninput: move |ev| {
-                                if let Some(value) = ev.value().parse().ok() {
-                                    color_control.with_mut(|control| control.color_temperature_mireds.set_user(value))
+                                input {
+                                    class: "temperature-slider",
+                                    style: "background: linear-gradient(to right in hsl, {
+                                                                    ColorControl::temperature_mireds_to_css_color(*hue_sat.color_temperature_mireds_min, 255)}, {
+                                                                    ColorControl::temperature_mireds_to_css_color(*hue_sat.color_temperature_mireds_max, 255)})",
+                                    r#type: "range",
+                                    oninput: move |ev| {
+                                        if let Some(value) = ev.value().parse().ok() {
+                                            color_control.with_mut(|control| if let Some(temperature) = &mut control.temperature {temperature.color_temperature_mireds.set_user(value)})
+                                        }
+                                    },
+                                    min: *hue_sat.color_temperature_mireds_min,
+                                    max: *hue_sat.color_temperature_mireds_max,
+                                    onmouseup: move |_| { call_control_callback() },
+                                    value: "{*hue_sat.color_temperature_mireds}",
                                 }
-                            },
-                            min: *color_control().color_temperature_mireds_min,
-                            max: *color_control().color_temperature_mireds_max,
-                            onmouseup: move |_| { call_control_callback() },
-                            value: "{*color_control().color_temperature_mireds}",
+                            }
+                        } else {
+                            rsx! {}
                         }
                     },
                     ColorControlMode::Xy => rsx! { "XY" },

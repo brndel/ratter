@@ -5,6 +5,10 @@ use crate::{
     id::EndpointId,
 };
 
+pub trait FromConnection: Sized {
+    fn from_connection(connection: &Connection) -> impl Future<Output = anyhow::Result<Self>>;
+}
+
 pub trait FromEndpoint: Sized {
     fn from_endpoint(
         connection: &Connection,

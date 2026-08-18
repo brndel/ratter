@@ -10,7 +10,7 @@ define_cluster!(
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct ElectricalEnergy {
-    energy: Option<u64>,
+    pub energy: Option<u64>,
 }
 
 #[cfg(feature = "backend")]

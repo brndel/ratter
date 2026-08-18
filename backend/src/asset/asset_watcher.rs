@@ -10,14 +10,14 @@ use notify::{FsEventWatcher, Watcher};
 use serde::de::DeserializeOwned;
 use shared_core::{
     asset::{
-        asset_registry::AssetError, automation::Automation, device::DeviceAsset, room::Room,
-        scene::Scene, scene_layer::SceneLayer,
+        asset_registry::AssetError, automation::Automation, device::DeviceAsset, label::Label,
+        room::Room, scene::Scene, scene_layer::SceneLayer,
     },
-    backend::DirectoryAsset,
+    backend::{DirectoryAsset, dir_path},
     event::{AssetEvent, AssetEventAction},
 };
 
-use crate::{asset::dir_path, event_bus::EventBusSender};
+use crate::event_bus::EventBusSender;
 
 pub struct AssetWatcher {
     sender: EventBusSender,
@@ -37,6 +37,7 @@ impl AssetWatcher {
         self.watch::<Scene>()?;
         self.watch::<SceneLayer>()?;
         self.watch::<Room>()?;
+        self.watch::<Label>()?;
         self.watch::<DeviceAsset>()?;
 
         Ok(self)
@@ -128,8 +129,16 @@ impl<T: DeserializeOwned> Handler<T> {
             .map(|stem| stem.to_string_lossy())
             .unwrap_or_default();
 
+        let Ok(asset) = name.parse() else {
+            warn!(
+                "could not read asset {}, file name could not be parsed to u64",
+                path.display()
+            );
+            return;
+        };
+
         self.sender.send(shared_core::event::Event::Asset {
-            asset: name.into_owned(),
+            asset,
             event: AssetEvent::from(AssetEventAction::Upsert(result)),
         });
     }
@@ -143,8 +152,16 @@ impl<T: DeserializeOwned> Handler<T> {
             .map(|stem| stem.to_string_lossy())
             .unwrap_or_default();
 
+        let Ok(asset) = name.parse() else {
+            warn!(
+                "could not read asset {}, file name could not be parsed to u64",
+                path.display()
+            );
+            return;
+        };
+
         self.sender.send(shared_core::event::Event::Asset {
-            asset: name.into_owned(),
+            asset,
             event: AssetEvent::from(AssetEventAction::<T>::Delete),
         });
     }
