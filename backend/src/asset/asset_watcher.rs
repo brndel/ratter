@@ -6,7 +6,7 @@ use std::{
 };
 
 use dioxus::logger::tracing::{info, warn};
-use notify::{FsEventWatcher, Watcher};
+use notify::{RecommendedWatcher, Watcher};
 use serde::de::DeserializeOwned;
 use shared_core::{
     asset::{
@@ -21,7 +21,7 @@ use crate::event_bus::EventBusSender;
 
 pub struct AssetWatcher {
     sender: EventBusSender,
-    watchers: HashMap<PathBuf, FsEventWatcher>,
+    watchers: HashMap<PathBuf, RecommendedWatcher>,
 }
 
 impl AssetWatcher {
