@@ -14,6 +14,7 @@ pkgs.rustPlatform.buildRustPackage {
   cargoLock.lockFile = ./Cargo.lock;
 
   nativeBuildInputs = shell.tools;
+  buildInputs = with pkgs; [ pkg-config ];
 
   buildPhase = ''
     dx bundle --release
