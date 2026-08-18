@@ -37,6 +37,21 @@
           }
       );
 
+      packages = forAllSystems (
+        system:
+        let
+          pkgs = import nixpkgs {
+            system = system;
+            overlays = [
+              rust-overlay.overlays.default
+            ];
+          };
+          package = import ./package.nix { inherit pkgs; };
+          in {
+            default = package;
+          }
+      );
+
       nixosModules.default = { config, lib, ... }:
         let
           pkgs = import nixpkgs {

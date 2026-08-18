@@ -1,6 +1,6 @@
 { pkgs }:
 let
-  rustShellToolchain = (pkgs.rust-bin.stable."1.97.1".minimal).override {
+  rustShellToolchain = (pkgs.rust-bin.stable."1.97.1".default).override {
     extensions = [
       "rust-src"
       "rust-analyzer"
@@ -29,7 +29,7 @@ let
       hash = "sha256-FTv2GZIAQs0ePdIZXIXil7JbZ6kIT05VG6vqC1qNFxQ=";
     };
   };
-  tools = [
+  tools = (with pkgs; [ binaryen ]) ++ [
     rustShellToolchain
     dioxus-cli
     wasm-bindgen-cli

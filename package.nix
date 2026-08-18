@@ -6,17 +6,19 @@
 let
   shell = import ./shell.nix { inherit pkgs; };
 in
-pkgs.stdenv.mkDerivation {
+pkgs.rustPlatform.buildRustPackage {
   pname = "ratter";
   version = "0.1.0";
 
   src = pkgs.lib.cleanSource ./.;
+  cargoLock.lockFile = ./Cargo.lock;
 
-  buildInputs = shell.tools;
+  nativeBuildInputs = shell.tools;
 
   buildPhase = ''
     dx bundle --release
   '';
+
   installPhase = ''
     mkdir $out/bin
 
