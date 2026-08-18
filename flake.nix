@@ -36,5 +36,7 @@
             default = shell.shell;
           }
       );
+
+      nixosModules.default = ./default.nix;
     };
 }
