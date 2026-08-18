@@ -13,7 +13,8 @@ pkgs.rustPlatform.buildRustPackage {
   src = pkgs.lib.cleanSource ./.;
   cargoLock.lockFile = ./Cargo.lock;
 
-  nativeBuildInputs = with pkgs; [ pkg-config ] ++ shell.tools;
+  nativeBuildInputs = with pkgs; [ pkg-config dbus ] ++ shell.tools;
+  buildInputs = with pkgs; [ dbus ];
 
   buildPhase = ''
     dx bundle --release
