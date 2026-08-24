@@ -265,7 +265,7 @@ fn DeviceListEntry(device_id: u64, device: Store<DeviceInitStatus>) -> Element {
         }
     };
 
-    let mut commission_code = use_signal(|| None);
+    let mut commission_code = use_signal(|| Option::<String>::None);
 
     rsx! {
         div { class: "device-list-entry", key: "{device_id}",
