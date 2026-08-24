@@ -136,8 +136,8 @@ impl Connections {
         });
 
         info!(
-            "opened commissioning window on discriminator '{}' and code '{}' (code of matter-controller: '{}')",
-            info.discriminator, code, code_of_other_crate
+            "opened commissioning window on discriminator '{}', passcode '{}' and code '{}' (code of matter-controller: '{}')",
+            info.discriminator, info.passcode, code, code_of_other_crate
         );
 
         Ok(code)
@@ -324,5 +324,36 @@ impl Connections {
         });
 
         Some(ReceiverStream::new(rx))
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+use matter_commissioning::parse_manual_code;
+
+use super::*;
+
+    #[test]
+    fn encode_decode_pairing_code() {
+        let payload = SetupPayload {
+            version: 0,
+            vendor_id: None,
+            product_id: None,
+            commissioning_flow: CommissioningFlow::Standard,
+            discovery_capabilities: DiscoveryCapabilities::ON_NETWORK,
+            discriminator: Discriminator::new(512).unwrap(),
+            passcode: Passcode::new(91431302).unwrap(),
+        };
+        let code = encode_manual_code(&payload);
+        println!("{code}");
+        let onboarding = parse_manual_code(&code).unwrap();
+
+        assert_eq!(
+            onboarding.discriminator, payload.discriminator
+        );
+        assert_eq!(
+            onboarding.passcode, payload.passcode
+        );
     }
 }
