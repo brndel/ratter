@@ -81,8 +81,8 @@ impl Connections {
         let mut rng = ThreadRng::default();
 
         let info = OnboardingInfo {
-            discriminator: rng.random(),
-            passcode: rng.random(),
+            discriminator: rng.random::<u16>() & 0x0FFF,
+            passcode: rng.random::<u32>() & 0x07FF_FFFF,
             is_short_discriminator: false,
             vendor_id: None,
             product_id: None,
