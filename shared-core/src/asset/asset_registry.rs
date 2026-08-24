@@ -227,7 +227,8 @@ impl AssetRegistry {
 mod asset_registry_write {
     use std::path::PathBuf;
 
-    use tokio::fs;
+    use jiff::Timestamp;
+use tokio::fs;
 
     use crate::backend::DirectoryAsset;
 
@@ -291,10 +292,8 @@ mod asset_registry_write {
 
             if let Some(Ok(device_asset)) = self.devices.get(&device_id) {
                 if device_asset.endpoints != endpoints {
-                    let new_asset = DeviceAsset {
-                        config: device_asset.config.clone(),
-                        endpoints,
-                    };
+                    let mut new_asset = (&**device_asset).clone();
+                    new_asset.endpoints = endpoints;
 
                     self.set_asset(device_id, new_asset).await?;
                 }

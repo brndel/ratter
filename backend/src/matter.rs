@@ -4,6 +4,7 @@ use anyhow::{Result, anyhow};
 use dioxus::logger::tracing::info;
 use futures::Stream;
 
+use jiff::Timestamp;
 use matter_controller::{
     AttestationTrust, FabricConfig, FabricInfo, FileStore, MatterController, MatterTime, ThreadDataset,
 };
@@ -318,6 +319,7 @@ impl MatterManagerInner {
                 .set_asset(
                     node_info.node_id,
                     DeviceAsset {
+                        commission_timestamp: Timestamp::now(),
                         config: device_asset,
                         endpoints: BTreeMap::new(),
                     },

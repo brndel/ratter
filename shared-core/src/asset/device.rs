@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 use crate::id::{AssetId, EndpointId};
@@ -7,6 +8,7 @@ use crate::id::{AssetId, EndpointId};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeviceAsset {
     pub config: DeviceAssetConfig,
+    pub commission_timestamp: Timestamp,
     pub endpoints: BTreeMap<EndpointId, BTreeSet<DeviceAssetDeviceKind>>,
 }
 

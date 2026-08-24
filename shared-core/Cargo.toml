@@ -11,6 +11,7 @@ serde = { workspace = true, features = ["rc"]}
 anyhow.workspace = true
 futures.workspace = true
 either_of.workspace = true
+jiff.workspace = true
 
 derive_more = { workspace = true, features = ["as_ref"] }
 toml.workspace = true
