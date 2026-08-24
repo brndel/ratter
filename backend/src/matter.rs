@@ -213,10 +213,9 @@ impl MatterManagerInner {
     }
 
     async fn load_or_init_device_manager() -> Result<MatterController> {
-        let path = "./data";
-        tokio::fs::create_dir_all(path).await?;
+        tokio::fs::create_dir_all("./data").await?;
 
-        let controller = MatterController::builder(Arc::new(FileStore::new("./data/matter-new")))
+        let controller = MatterController::builder(Arc::new(FileStore::new("./data/matter_controller")))
             .attestation_trust(AttestationTrust::from_dirs("certs/paa-root-certs".as_ref(), "certs/cd-certs".as_ref())?)
             .build()
             .await?;
