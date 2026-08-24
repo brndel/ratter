@@ -6,15 +6,13 @@ use dioxus::logger::tracing::{error, info};
 use futures::Stream;
 use matc::{
     clusters::codec::{
-        admin_commissioning_cluster::open_commissioning_window,
-        operational_credential_cluster::{read_fabrics, remove_fabric},
-    },
-    controller::Connection,
-    devman::DeviceManager,
-    messages::pake1,
-    onboarding::{OnboardingInfo, encode_manual_pairing_code},
+        acl_cluster::{self, read_access_control_entries_per_fabric}, admin_commissioning_cluster::{open_commissioning_window, read_window_status}, commissioner_control_cluster::decode_reverse_open_commissioning_window, joint_fabric_datastore_cluster::read_node_acl_list, operational_credential_cluster::{read_fabrics, remove_fabric},
+    }, controller::Connection, devman::DeviceManager, messages::{pake1, parse_im_invoke_resp}, onboarding::{OnboardingInfo, encode_manual_pairing_code},
 };
-use matter_commissioning::{CommissioningFlow, DiscoveryCapabilities, Discriminator, Passcode, SetupPayload, encode_manual_code};
+use matter_commissioning::{
+    CommissioningFlow, DiscoveryCapabilities, Discriminator, Passcode, SetupPayload,
+    encode_manual_code,
+};
 use rand::{Rng, RngExt, rand_core::utils::fill_bytes_via_next_word, rngs::ThreadRng};
 use shared_core::{
     asset::asset_registry::AssetRegistry,
@@ -85,59 +83,72 @@ impl Connections {
     }
 
     pub async fn open_commission_window(&self, device: DeviceId) -> Result<String> {
-        let connection = self
-            .get_connection(device)
-            .await
-            .ok_or(anyhow!("not connected"))?;
 
-        let mut rng = ThreadRng::default();
+        
+        let connection = self
+        .get_connection(device)
+        .await
+        .ok_or(anyhow!("not connected"))?;
+
+        let access_control = acl_cluster::read_acl(&connection, 0).await?;
+        info!("access_control: {access_control:?}");
+
+        let (passcode, salt, discriminator) = random_window_secrets()?;
+
+        let discriminator = discriminator & 0x0F00;
 
         let info = OnboardingInfo {
-            discriminator: rng.random::<u16>() & 0x0F00,
-            passcode: rng.random_range(1..=99_999_998),
-            is_short_discriminator: false,
+            discriminator,
+            passcode,
+            is_short_discriminator: true,
             vendor_id: None,
             product_id: None,
             discovery_capabilities: None,
         };
         let iterations = 2000;
 
-        let mut salt = [0u8; 32];
-        fill_bytes_via_next_word(&mut salt, || Ok::<_, ()>(rng.next_u32())).unwrap();
-        let key = matc::controller::pin_to_passcode(info.passcode).map_err(|e| anyhow!("{e:?}"))?;
-        let verifier = matc::spake2p::Engine::create_passcode_verifier(&key, &salt, iterations);
+        // let mut salt = [0u8; 32];
+        // fill_bytes_via_next_word(&mut salt, || Ok::<_, ()>(rng.next_u32())).unwrap();
+        // let key = matc::controller::pin_to_passcode(info.passcode).map_err(|e| anyhow!("{e:?}"))?;
+        // let verifier = matc::spake2p::Engine::create_passcode_verifier(&key, &salt, iterations);
 
-        let matter_controller_verifier = matter_crypto::pake_passcode_verifier(info.passcode, &salt, iterations)?;
+        let verifier =
+            matter_crypto::pake_passcode_verifier(info.passcode, &salt, iterations)?;
 
-        if verifier.as_slice() != matter_controller_verifier.as_ref() {
-            info!("verifiers do not match!!");
-        }
+        // if verifier.as_slice() != matter_controller_verifier.as_ref() {
+        //     info!("verifiers do not match!!");
+        // }
 
-        open_commissioning_window(
-            &connection,
-            0,
-            100,
-            verifier,
-            info.discriminator,
-            iterations,
-            salt.to_vec(),
-        )
-        .await?;
+        let payload = matc::clusters::codec::admin_commissioning_cluster::encode_open_commissioning_window(180, verifier.to_vec(), info.discriminator, iterations, salt.to_vec())?;
+        info!("payload: {payload:?}");
+
+        let result = connection.invoke_request_timed(0,
+            matc::clusters::defs::CLUSTER_ID_ADMINISTRATOR_COMMISSIONING, matc::clusters::defs::CLUSTER_ADMINISTRATOR_COMMISSIONING_CMD_ID_OPENCOMMISSIONINGWINDOW, &payload, 6000).await?;
+
+        let (tag, status) = parse_im_invoke_resp(&result.tlv)?;
+            
+        info!("open window result: {result:?}");
+        info!("tag: {tag}, status: {status}");
+        let status = read_window_status(&connection, 0).await?;
+        info!("window status: {status:?}");
+
+
+        // open_commissioning_window(
+        //     &connection,
+        //     0,
+        //     200,
+        //     verifier,
+        //     info.discriminator,
+        //     iterations,
+        //     salt.to_vec(),
+        // )
+        // .await?;
 
         let code = encode_manual_pairing_code(&info);
-        let code_of_other_crate = encode_manual_code(&SetupPayload {
-            version: 0,
-            vendor_id: None,
-            product_id: None,
-            commissioning_flow: CommissioningFlow::Standard,
-            discovery_capabilities: DiscoveryCapabilities::ON_NETWORK,
-            discriminator: Discriminator::new(info.discriminator).unwrap(),
-            passcode: Passcode::new(info.passcode).unwrap(),
-        });
 
         info!(
-            "opened commissioning window on discriminator '{}', passcode '{}' and code '{}' (code of matter-controller: '{}')",
-            info.discriminator, info.passcode, code, code_of_other_crate
+            "opened commissioning window on discriminator '{}', passcode '{}' and code '{}')",
+            info.discriminator, info.passcode, code
         );
 
         Ok(code)
@@ -327,13 +338,12 @@ impl Connections {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-use matc::onboarding::decode_manual_pairing_code;
-use matter_commissioning::parse_manual_code;
+    use matc::onboarding::decode_manual_pairing_code;
+    use matter_commissioning::{encode_qr, parse_manual_code};
 
-use super::*;
+    use super::*;
 
     #[test]
     fn encode_decode_pairing_code() {
@@ -356,14 +366,12 @@ use super::*;
         let onboarding_matc = decode_manual_pairing_code(&code).unwrap();
 
         assert_eq!(
-            payload.discriminator.as_u16(), onboarding.discriminator.as_u16()
+            payload.discriminator.as_u16(),
+            onboarding.discriminator.as_u16()
         );
-        assert_eq!(
-            payload.passcode.as_u32(), onboarding.passcode.as_u32()
-        );
+        assert_eq!(payload.passcode.as_u32(), onboarding.passcode.as_u32());
     }
 }
-
 
 /// Generate a valid `(passcode, salt, discriminator)` for an enhanced window.
 ///
@@ -375,9 +383,7 @@ use super::*;
 /// is found within the retry budget (practically never — ~12 values excluded).
 pub(crate) fn random_window_secrets() -> Result<(u32, [u8; 32], u16), anyhow::Error> {
     use matter_commissioning::setup::Passcode;
-    let rng = |buf: &mut [u8]| {
-        matter_crypto::random_bytes(buf).map_err(|e| anyhow!("rng: {e}"))
-    };
+    let rng = |buf: &mut [u8]| matter_crypto::random_bytes(buf).map_err(|e| anyhow!("rng: {e}"));
     let mut salt = [0u8; 32];
     rng(&mut salt)?;
     let mut db = [0u8; 2];
@@ -393,7 +399,5 @@ pub(crate) fn random_window_secrets() -> Result<(u32, [u8; 32], u16), anyhow::Er
             return Ok((candidate, salt, discriminator));
         }
     }
-    Err(anyhow!(
-        "could not generate a valid passcode"
-    ))
+    Err(anyhow!("could not generate a valid passcode"))
 }
