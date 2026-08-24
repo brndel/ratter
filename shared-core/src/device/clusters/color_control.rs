@@ -17,7 +17,7 @@ use crate::device::clusters::{ChangeEvent, define_cluster_macro::define_cluster}
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct ColorControl {
-    pub features: u8,
+    pub features: u16,
     pub hue_saturation: Option<ColorControlFeatureHueSat>,
     pub temperature: Option<ColorControlFeatureTemperature>,
     pub xy: Option<ColorControlFeatureXy>,
@@ -148,146 +148,131 @@ impl ChangeEvent for ColorControlChange {
 }
 #[cfg(feature = "backend")]
 mod backend_impl {
-    use matc::clusters::codec::color_control;
+    use matter_clusters::r#gen::color_control::{self, ColorCapabilitiesBitmap};
+    use matter_codec::{TlvWriter, Value};
+    use matter_controller::{Node, ReadPath};
+
+    use crate::read_decode;
 
     impl crate::backend::ClusterState for super::ColorControl {
         const CLUSTER_ID: u32 = matc::clusters::defs::CLUSTER_ID_COLOR_CONTROL;
     }
     impl crate::backend::FromEndpoint for super::ColorControl {
-        async fn from_endpoint(
-            connection: &matc::controller::Connection,
-            endpoint: u16,
-        ) -> anyhow::Result<Self> {
-            let features = color_control::read_color_capabilities(connection, endpoint).await?;
+        async fn from_endpoint(node: &Node, endpoint: u16) -> anyhow::Result<Self> {
+            read_decode!(node, endpoint, [
+                features = { color_control, COLOR_CAPABILITIES, decode_color_capabilities },
+                color_mode = { color_control, COLOR_MODE, decode_color_mode }
+            ]);
 
             Ok(Self {
-                features,
-                hue_saturation: if features & color_control::colorcapabilities::HUE_SATURATION != 0
-                {
+                features: features.bits(),
+                hue_saturation: if features.contains(ColorCapabilitiesBitmap::HUE_SATURATION) {
+                    Some(super::ColorControlFeatureHueSat::from_endpoint(node, endpoint).await?)
+                } else {
+                    None
+                },
+                temperature: if features.contains(ColorCapabilitiesBitmap::COLOR_TEMPERATURE) {
                     Some(
-                        super::ColorControlFeatureHueSat::from_endpoint(connection, endpoint)
+                        super::ColorControlFeatureTemperature::from_endpoint(node, endpoint)
                             .await?,
                     )
                 } else {
                     None
                 },
-                temperature: if features & color_control::colorcapabilities::COLOR_TEMPERATURE != 0
-                {
-                    Some(
-                        super::ColorControlFeatureTemperature::from_endpoint(connection, endpoint)
-                            .await?,
-                    )
+                xy: if features.contains(ColorCapabilitiesBitmap::XY) {
+                    Some(super::ColorControlFeatureXy::from_endpoint(node, endpoint).await?)
                 } else {
                     None
                 },
-                xy: if features & color_control::colorcapabilities::XY != 0 {
-                    Some(super::ColorControlFeatureXy::from_endpoint(connection, endpoint).await?)
-                } else {
-                    None
-                },
-                color_mode: crate::device::clusters::DeviceValue::new(
-                    color_control::read_color_mode(connection, endpoint)
-                        .await?
-                        .into(),
-                ),
+                color_mode: crate::device::clusters::DeviceValue::new(color_mode.into()),
             })
         }
     }
 
     impl crate::backend::FromEndpoint for super::ColorControlFeatureHueSat {
-        async fn from_endpoint(
-            connection: &matc::controller::Connection,
-            endpoint: u16,
-        ) -> anyhow::Result<Self> {
+        async fn from_endpoint(node: &Node, endpoint: u16) -> anyhow::Result<Self> {
+            read_decode!(node, endpoint, [
+                current_hue = {color_control, CURRENT_HUE, decode_current_hue},
+                current_saturation = {color_control, CURRENT_SATURATION, decode_current_saturation}
+            ]);
+
             Ok(Self {
-                current_hue: crate::device::clusters::DeviceValue::new(
-                    color_control::read_current_hue(connection, endpoint)
-                        .await?
-                        .into(),
-                ),
-                current_saturation: crate::device::clusters::DeviceValue::new(
-                    color_control::read_current_saturation(connection, endpoint)
-                        .await?
-                        .into(),
-                ),
+                current_hue: crate::device::clusters::DeviceValue::new(current_hue),
+                current_saturation: crate::device::clusters::DeviceValue::new(current_saturation),
             })
         }
     }
 
     impl crate::backend::FromEndpoint for super::ColorControlFeatureTemperature {
-        async fn from_endpoint(
-            connection: &matc::controller::Connection,
-            endpoint: u16,
-        ) -> anyhow::Result<Self> {
+        async fn from_endpoint(node: &Node, endpoint: u16) -> anyhow::Result<Self> {
+            read_decode!(node, endpoint, [
+                color_temperature_mireds = {color_control, COLOR_TEMPERATURE_MIREDS, decode_color_temperature_mireds},
+                color_temperature_mireds_min = {color_control, COLOR_TEMP_PHYSICAL_MIN_MIREDS, decode_color_temp_physical_min_mireds},
+                color_temperature_mireds_max = {color_control, COLOR_TEMP_PHYSICAL_MAX_MIREDS, decode_color_temp_physical_max_mireds}
+            ]);
+
             Ok(Self {
                 color_temperature_mireds: crate::device::clusters::DeviceValue::new(
-                    color_control::read_color_temperature_mireds(connection, endpoint)
-                        .await?
-                        .into(),
+                    color_temperature_mireds,
                 ),
                 color_temperature_mireds_min: crate::device::clusters::DeviceValue::new(
-                    color_control::read_color_temp_physical_min_mireds(connection, endpoint)
-                        .await?
-                        .into(),
+                    color_temperature_mireds_min,
                 ),
                 color_temperature_mireds_max: crate::device::clusters::DeviceValue::new(
-                    color_control::read_color_temp_physical_max_mireds(connection, endpoint)
-                        .await?
-                        .into(),
+                    color_temperature_mireds_max,
                 ),
             })
         }
     }
     impl crate::backend::FromEndpoint for super::ColorControlFeatureXy {
-        async fn from_endpoint(
-            connection: &matc::controller::Connection,
-            endpoint: u16,
-        ) -> anyhow::Result<Self> {
+        async fn from_endpoint(node: &Node, endpoint: u16) -> anyhow::Result<Self> {
+            read_decode!(node, endpoint, [
+                current_x = {color_control, CURRENT_X, decode_current_x},
+                current_y = {color_control, CURRENT_Y, decode_current_y}
+            ]);
+
             Ok(Self {
-                current_x: crate::device::clusters::DeviceValue::new(
-                    color_control::read_current_x(connection, endpoint)
-                        .await?
-                        .into(),
-                ),
-                current_y: crate::device::clusters::DeviceValue::new(
-                    color_control::read_current_y(connection, endpoint)
-                        .await?
-                        .into(),
-                ),
+                current_x: crate::device::clusters::DeviceValue::new(current_x),
+                current_y: crate::device::clusters::DeviceValue::new(current_y),
             })
         }
     }
 
     impl crate::backend::FromAttrChange for super::ColorControlChange {
-        fn from_attr_change(attr: u32, value: &matc::tlv::TlvItemValue) -> anyhow::Result<Self> {
+        fn from_attr_change(attr: u32, value: &Value) -> anyhow::Result<Self> {
+            let mut tlv_bytes = Vec::new();
+            let mut writer = TlvWriter::new(&mut tlv_bytes);
+            writer.write_value(matter_codec::Tag::Anonymous, &value);
+
             let value = match attr {
                 matc::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_CURRENTHUE => {
                     Self::SetCurrentHue {
-                        current_hue: color_control::decode_current_hue(value)?.into(),
+                        current_hue: color_control::decode_current_hue(&tlv_bytes)?.into(),
                     }
                 }
                 matc::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_CURRENTSATURATION => {
                     Self::SetCurrentSaturation {
-                        current_saturation: color_control::decode_current_saturation(value)?.into(),
+                        current_saturation: color_control::decode_current_saturation(&tlv_bytes)?
+                            .into(),
                     }
                 }
                 matc::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_CURRENTX => Self::SetCurrentX {
-                    current_x: color_control::decode_current_x(value)?.into(),
+                    current_x: color_control::decode_current_x(&tlv_bytes)?.into(),
                 },
                 matc::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_CURRENTY => Self::SetCurrentY {
-                    current_y: color_control::decode_current_y(value)?.into(),
+                    current_y: color_control::decode_current_y(&tlv_bytes)?.into(),
                 },
                 matc::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_COLORTEMPERATUREMIREDS => {
                     Self::SetColorTemperatureMireds {
                         color_temperature_mireds: color_control::decode_color_temperature_mireds(
-                            value,
+                            &tlv_bytes,
                         )?
                         .into(),
                     }
                 }
                 matc::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_COLORMODE => {
                     Self::SetColorMode {
-                        color_mode: color_control::decode_color_mode(value)?.into(),
+                        color_mode: color_control::decode_color_mode(&tlv_bytes)?.into(),
                     }
                 }
                 _ => return Err(anyhow::anyhow!("unkown attr")),
@@ -302,19 +287,17 @@ pub enum ColorControlMode {
     HueSaturation,
     Xy,
     Temperature,
+    Unkown,
 }
 
 #[cfg(feature = "backend")]
-impl From<matc::clusters::codec::color_control::ColorMode> for ColorControlMode {
-    fn from(value: matc::clusters::codec::color_control::ColorMode) -> Self {
+impl From<matter_clusters::r#gen::color_control::ColorModeEnum> for ColorControlMode {
+    fn from(value: matter_clusters::r#gen::color_control::ColorModeEnum) -> Self {
         match value {
-            matc::clusters::codec::color_control::ColorMode::Currenthueandcurrentsaturation => {
-                Self::HueSaturation
-            }
-            matc::clusters::codec::color_control::ColorMode::Currentxandcurrenty => Self::Xy,
-            matc::clusters::codec::color_control::ColorMode::Colortemperaturemireds => {
-                Self::Temperature
-            }
+            matter_clusters::r#gen::color_control::ColorModeEnum::CurrentHueAndCurrentSaturation => Self::HueSaturation,
+            matter_clusters::r#gen::color_control::ColorModeEnum::CurrentXAndCurrentY => Self::Xy,
+            matter_clusters::r#gen::color_control::ColorModeEnum::ColorTemperatureMireds => Self::Temperature,
+            matter_clusters::r#gen::color_control::ColorModeEnum::Unknown(_) => Self::Unkown,
         }
     }
 }
@@ -329,27 +312,32 @@ pub enum ColorControlAction {
 #[cfg(feature = "backend")]
 mod impl_action {
     use super::*;
-    use crate::{backend::RunClusterAction, device::AttrChange};
-    use matc::clusters::codec::*;
+    use crate::{backend::RunClusterAction, device::AttrChange, invoke};
+    use matter_clusters::r#gen::color_control::OptionsBitmap;
+    use matter_controller::Node;
 
     impl RunClusterAction for ColorControlAction {
         type Cluster = ColorControl;
 
         async fn run(
             self,
-            connection: &matc::controller::Connection,
+            node: &Node,
             endpoint: crate::id::EndpointId,
         ) -> anyhow::Result<Vec<AttrChange>> {
             match self {
                 ColorControlAction::SetHueSaturation { hue, saturation } => {
-                    color_control::move_to_hue_and_saturation(
-                        connection,
+                    invoke!(
+                        node,
                         endpoint,
-                        hue,
-                        saturation,
-                        0,
-                        color_control::options::EXECUTE_IF_OFF,
-                        color_control::options::EXECUTE_IF_OFF,
+                        color_control,
+                        MOVE_TO_HUE_AND_SATURATION,
+                        encode_move_to_hue_and_saturation(
+                            hue,
+                            saturation,
+                            0,
+                            OptionsBitmap::EXECUTE_IF_OFF,
+                            OptionsBitmap::EXECUTE_IF_OFF
+                        )
                     )
                     .await?;
 
@@ -366,14 +354,18 @@ mod impl_action {
                     ])
                 }
                 ColorControlAction::SetXY { x, y } => {
-                    color_control::move_to_color(
-                        connection,
+                    invoke!(
+                        node,
                         endpoint,
-                        x,
-                        y,
-                        0,
-                        color_control::options::EXECUTE_IF_OFF,
-                        color_control::options::EXECUTE_IF_OFF,
+                        color_control,
+                        MOVE_TO_HUE_AND_SATURATION,
+                        encode_move_to_color(
+                            x,
+                            y,
+                            0,
+                            OptionsBitmap::EXECUTE_IF_OFF,
+                            OptionsBitmap::EXECUTE_IF_OFF
+                        )
                     )
                     .await?;
 
@@ -387,13 +379,17 @@ mod impl_action {
                     ])
                 }
                 ColorControlAction::SetColorTemperature { temperature } => {
-                    color_control::move_to_color_temperature(
-                        connection,
+                                        invoke!(
+                        node,
                         endpoint,
-                        temperature,
-                        0,
-                        color_control::options::EXECUTE_IF_OFF,
-                        color_control::options::EXECUTE_IF_OFF,
+                        color_control,
+                        MOVE_TO_HUE_AND_SATURATION,
+                        encode_move_to_color_temperature(
+                            temperature,
+                            0,
+                            OptionsBitmap::EXECUTE_IF_OFF,
+                            OptionsBitmap::EXECUTE_IF_OFF
+                        )
                     )
                     .await?;
 
@@ -437,7 +433,7 @@ impl ColorControl {
                     format!("purple")
                 }
             }
-            ColorControlMode::Xy => format!("#ff00ff"),
+            ColorControlMode::Xy | ColorControlMode::Unkown => format!("#ff00ff"),
         }
     }
 

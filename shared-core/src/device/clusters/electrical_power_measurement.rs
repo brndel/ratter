@@ -3,20 +3,20 @@ use serde::{Deserialize, Serialize};
 use crate::device::clusters::{ChangeEvent, define_cluster_macro::define_cluster};
 
 define_cluster!(
-    struct ElectricalPowerMeasurement, enum ElectricalPowerMeasurementChange, electrical_power_measurement, CLUSTER_ID_ELECTRICAL_POWER_MEASUREMENT {
-        power_mode: ElectricalPowerMode => CLUSTER_ELECTRICAL_POWER_MEASUREMENT_ATTR_ID_POWERMODE as SetPowerMode { read_power_mode, decode_power_mode },
-        voltage: Option<u8> => CLUSTER_ELECTRICAL_POWER_MEASUREMENT_ATTR_ID_VOLTAGE as SetVoltage { read_voltage, decode_voltage },
-        active_current: Option<u8> => CLUSTER_ELECTRICAL_POWER_MEASUREMENT_ATTR_ID_ACTIVECURRENT as SetActiveCurrent { read_active_current, decode_active_current },
-        reactive_current: Option<u8> => CLUSTER_ELECTRICAL_POWER_MEASUREMENT_ATTR_ID_REACTIVECURRENT as SetReactiveCurrent { read_reactive_current, decode_reactive_current },
-        apparent_current: Option<u8> => CLUSTER_ELECTRICAL_POWER_MEASUREMENT_ATTR_ID_APPARENTCURRENT as SetApparentCurrent { read_apparent_current, decode_apparent_current },
-        active_power: Option<u32> => CLUSTER_ELECTRICAL_POWER_MEASUREMENT_ATTR_ID_ACTIVEPOWER as SetActivePower { read_active_power, decode_active_power },
-        reactive_power: Option<u8> => CLUSTER_ELECTRICAL_POWER_MEASUREMENT_ATTR_ID_REACTIVEPOWER as SetReactivePower { read_reactive_power, decode_reactive_power },
-        apparent_power: Option<u8> => CLUSTER_ELECTRICAL_POWER_MEASUREMENT_ATTR_ID_APPARENTPOWER as SetApparentPower { read_apparent_power, decode_apparent_power },
-        rms_voltage: Option<u8> => CLUSTER_ELECTRICAL_POWER_MEASUREMENT_ATTR_ID_RMSVOLTAGE as SetRmsVoltage { read_rms_voltage, decode_rms_voltage },
-        rms_current: Option<u8> => CLUSTER_ELECTRICAL_POWER_MEASUREMENT_ATTR_ID_RMSCURRENT as SetRmsCurrent { read_rms_current, decode_rms_current },
-        rms_power: Option<u32> => CLUSTER_ELECTRICAL_POWER_MEASUREMENT_ATTR_ID_RMSPOWER as SetRmsPower { read_rms_power, decode_rms_power },
-        frequency: Option<i64> => CLUSTER_ELECTRICAL_POWER_MEASUREMENT_ATTR_ID_FREQUENCY as SetFrequency { read_frequency, decode_frequency },
-        power_factor: Option<i64> => CLUSTER_ELECTRICAL_POWER_MEASUREMENT_ATTR_ID_POWERFACTOR as SetPowerFactor { read_power_factor, decode_power_factor }
+    struct ElectricalPowerMeasurement, enum ElectricalPowerMeasurementChange, electrical_power_measurement {
+        power_mode: ElectricalPowerMode => POWER_MODE as SetPowerMode { decode_power_mode },
+        voltage: Option<i64> => VOLTAGE as SetVoltage { decode_voltage => matter_clusters::types::Nullable::value },
+        active_current: Option<i64> => ACTIVE_CURRENT as SetActiveCurrent { decode_active_current => matter_clusters::types::Nullable::value },
+        reactive_current: Option<i64> => REACTIVE_CURRENT as SetReactiveCurrent { decode_reactive_current => matter_clusters::types::Nullable::value },
+        apparent_current: Option<i64> => APPARENT_CURRENT as SetApparentCurrent { decode_apparent_current => matter_clusters::types::Nullable::value },
+        active_power: Option<i64> => ACTIVE_POWER as SetActivePower { decode_active_power => matter_clusters::types::Nullable::value },
+        reactive_power: Option<i64> => REACTIVE_POWER as SetReactivePower { decode_reactive_power => matter_clusters::types::Nullable::value },
+        apparent_power: Option<i64> => APPARENT_POWER as SetApparentPower { decode_apparent_power => matter_clusters::types::Nullable::value },
+        rms_voltage: Option<i64> => RMS_VOLTAGE as SetRmsVoltage { decode_rms_voltage => matter_clusters::types::Nullable::value },
+        rms_current: Option<i64> => RMS_CURRENT as SetRmsCurrent { decode_rms_current => matter_clusters::types::Nullable::value },
+        rms_power: Option<i64> => RMS_POWER as SetRmsPower { decode_rms_power => matter_clusters::types::Nullable::value },
+        frequency: Option<i64> => FREQUENCY as SetFrequency { decode_frequency => matter_clusters::types::Nullable::value },
+        power_factor: Option<i64> => POWER_FACTOR as SetPowerFactor { decode_power_factor => matter_clusters::types::Nullable::value }
     }
 );
 
@@ -30,14 +30,15 @@ pub enum ElectricalPowerMode {
 #[cfg(feature = "backend")]
 mod backend_impl_2 {
     use super::*;
-    use matc::clusters::codec::electrical_power_measurement::PowerMode;
+use matter_clusters::r#gen::electrical_power_measurement::PowerModeEnum;
 
-    impl From<PowerMode> for ElectricalPowerMode {
-        fn from(value: PowerMode) -> Self {
+    impl From<PowerModeEnum> for ElectricalPowerMode {
+        fn from(value: PowerModeEnum) -> Self {
             match value {
-                PowerMode::Unknown => Self::Unkown,
-                PowerMode::Dc => Self::Dc,
-                PowerMode::Ac => Self::Ac,
+                PowerModeEnum::Unknown => Self::Unkown,
+                PowerModeEnum::Dc => Self::Dc,
+                PowerModeEnum::Ac => Self::Ac,
+                PowerModeEnum::Unrecognized(_) => Self::Unkown,
             }
         }
     }

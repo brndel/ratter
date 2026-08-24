@@ -49,7 +49,7 @@ impl AutomationCondition {
             devices
                 .get_cluster(endpoint)
                 .and_then(|clusters| clusters.occupancy_sensing)
-                .is_some_and(|occupancy| *occupancy.occupancy != 0)
+                .is_some_and(|occupancy| *occupancy.is_occupied)
         })
     }
 }

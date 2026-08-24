@@ -23,7 +23,7 @@ impl<'a> TryFrom<&'a Clusters> for OccupancySensorParamsClusters<'a> {
 impl<'a> From<OccupancySensorParamsClusters<'a>> for OccupancySensorParams {
     fn from(value: OccupancySensorParamsClusters<'a>) -> Self {
         Self {
-            is_occupied: (*value.occupancy.occupancy) != 0,
+            is_occupied: *value.occupancy.is_occupied,
         }
     }
 }

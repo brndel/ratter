@@ -8,6 +8,7 @@ mod names;
 mod occupancy_sensing;
 mod on_off;
 mod power_source;
+mod macro_read_invoke;
 
 use std::ops::Deref;
 
@@ -21,6 +22,8 @@ pub use names::get_cluster_name;
 pub use occupancy_sensing::*;
 pub use on_off::*;
 pub use power_source::*;
+#[cfg(feature = "backend")]
+pub use macro_read_invoke::{invoke, read_decode};
 use serde::{Deserialize, Serialize};
 
 use crate::{device::attr_change::AttrChange, event::AttrChangeSource, id::ClusterId};
@@ -139,16 +142,20 @@ impl Clusters {
 #[cfg(feature = "backend")]
 mod impl_from_endpoint {
     use super::*;
-    use crate::backend::{ClusterState, FromEndpoint};
-    use matc::clusters::codec::descriptor_cluster;
+    use crate::{backend::{ClusterState, FromEndpoint}, read_decode};
+use matter_controller::Node;
 
     impl FromEndpoint for Clusters {
         async fn from_endpoint(
-            connection: &matc::controller::Connection,
+            node: &Node,
             endpoint: u16,
         ) -> anyhow::Result<Self> {
-            let clusters = descriptor_cluster::read_server_list(connection, endpoint).await?;
-
+            read_decode!(
+                node, endpoint, [
+                    clusters = {descriptor, SERVER_LIST, decode_server_list}
+                ]
+            );
+            
             let mut result = Self::default();
 
             for cluster in clusters {
@@ -156,34 +163,34 @@ mod impl_from_endpoint {
                 match cluster {
                     PowerSource::CLUSTER_ID => {
                         let target = <Clusters as AsMut<Option<PowerSource>>>::as_mut(&mut result);
-                        *target = Some(PowerSource::from_endpoint(connection, endpoint).await?)
+                        *target = Some(PowerSource::from_endpoint(node, endpoint).await?)
                     }
                     OnOff::CLUSTER_ID => {
-                        result.on_off = Some(OnOff::from_endpoint(connection, endpoint).await?)
+                        result.on_off = Some(OnOff::from_endpoint(node, endpoint).await?)
                     }
                     LevelControl::CLUSTER_ID => {
                         result.level_control =
-                            Some(LevelControl::from_endpoint(connection, endpoint).await?)
+                            Some(LevelControl::from_endpoint(node, endpoint).await?)
                     }
                     ColorControl::CLUSTER_ID => {
                         result.color_control =
-                            Some(ColorControl::from_endpoint(connection, endpoint).await?)
+                            Some(ColorControl::from_endpoint(node, endpoint).await?)
                     }
                     OccupancySensing::CLUSTER_ID => {
                         result.occupancy_sensing =
-                            Some(OccupancySensing::from_endpoint(connection, endpoint).await?)
+                            Some(OccupancySensing::from_endpoint(node, endpoint).await?)
                     }
                     Identify::CLUSTER_ID => {
-                        result.identify = Some(Identify::from_endpoint(connection, endpoint).await?)
+                        result.identify = Some(Identify::from_endpoint(node, endpoint).await?)
                     }
                     ElectricalPowerMeasurement::CLUSTER_ID => {
                         result.electrical_power_measurement = Some(
-                            ElectricalPowerMeasurement::from_endpoint(connection, endpoint).await?,
+                            ElectricalPowerMeasurement::from_endpoint(node, endpoint).await?,
                         )
                     }
                     ElectricalEnergyMeasurement::CLUSTER_ID => {
                         result.electrical_energy_measurement = Some(
-                            ElectricalEnergyMeasurement::from_endpoint(connection, endpoint)
+                            ElectricalEnergyMeasurement::from_endpoint(node, endpoint)
                                 .await?,
                         )
                     }

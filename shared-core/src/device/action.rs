@@ -19,7 +19,7 @@ pub enum EndpointAction {
 
 #[cfg(feature = "backend")]
 mod impl_run_action {
-    use matc::controller::Connection;
+    use matter_controller::Node;
 
     use super::*;
     use crate::{backend::RunClusterAction, device::AttrChange, id::EndpointId};
@@ -27,14 +27,14 @@ mod impl_run_action {
     impl EndpointAction {
         pub async fn run(
             self,
-            connection: &Connection,
+            node: &Node,
             endpoint: EndpointId,
         ) -> anyhow::Result<Vec<AttrChange>> {
             match self {
-                EndpointAction::OnOff(action) => action.run(connection, endpoint).await,
-                EndpointAction::LevelControl(action) => action.run(connection, endpoint).await,
-                EndpointAction::ColorControl(action) => action.run(connection, endpoint).await,
-                EndpointAction::Identify(action) => action.run(connection, endpoint).await,
+                EndpointAction::OnOff(action) => action.run(node, endpoint).await,
+                EndpointAction::LevelControl(action) => action.run(node, endpoint).await,
+                EndpointAction::ColorControl(action) => action.run(node, endpoint).await,
+                EndpointAction::Identify(action) => action.run(node, endpoint).await,
             }
         }
     }

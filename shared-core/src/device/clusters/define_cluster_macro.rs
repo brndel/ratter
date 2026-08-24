@@ -1,6 +1,19 @@
+macro_rules! transform_field {
+    ($field_name:ident => $transform:path) => {
+        $transform($field_name)
+    };
+    ($field_name:ident => &$transform:path) => {
+        $transform(&$field_name)
+    };
+    ($field_name:ident) => {
+        $field_name.into()
+    };
+}
+
+
 macro_rules! define_cluster {
-    (struct $struct_name:ident, enum $enum_name:ident, $cluster_mod:ident, $cluster_id:ident {
-        $($field_name:ident : $field_ty:ty => $attr_id:ident as $field_enum_variant:ident { $read_fn:ident, $decode_fn:ident }),*
+    (struct $struct_name:ident, enum $enum_name:ident, $cluster:ident {
+        $($field_name:ident : $field_ty:ty => $attr_id:ident as $field_enum_variant:ident { $decode_fn:ident $(=> $transform:path)? }),*
     }) => {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -39,26 +52,42 @@ impl ChangeEvent for $enum_name {
 
 #[cfg(feature = "backend")]
 mod backend_impl {
+    #[allow(unused_imports)]
+    use super::*;
+
     impl crate::backend::ClusterState for super::$struct_name {
-        const CLUSTER_ID: u32 = matc::clusters::defs::$cluster_id;
+        const CLUSTER_ID: u32 = matter_clusters::r#gen::$cluster::CLUSTER_ID;
     }
 
     impl crate::backend::FromEndpoint for super::$struct_name {
-        async fn from_endpoint(connection: &matc::controller::Connection, endpoint: u16) -> anyhow::Result<Self> {
+        async fn from_endpoint(node: &matter_controller::Node, endpoint: u16) -> anyhow::Result<Self> {
+            crate::device::clusters::read_decode!(node, endpoint, [
+                $(
+                    $field_name = {$cluster, $attr_id, $decode_fn}
+                ),*
+            ]);
+
             Ok(Self {
                 $(
-                    $field_name: crate::device::clusters::DeviceValue::new(matc::clusters::codec::$cluster_mod::$read_fn(connection, endpoint).await?.into())
+                    $field_name: crate::device::clusters::DeviceValue::new(crate::device::clusters::define_cluster_macro::transform_field!($field_name $(=> $transform)?))
                 ),*
             })
         }
     }
 
     impl crate::backend::FromAttrChange for super::$enum_name {
-        fn from_attr_change(attr: u32, value: &matc::tlv::TlvItemValue) -> anyhow::Result<Self> {
+        fn from_attr_change(attr: u32, value: &matter_codec::Value) -> anyhow::Result<Self> {
+            let mut tlv_bytes = Vec::new();
+            let mut writer = matter_codec::TlvWriter::new(&mut tlv_bytes);
+            writer.write_value(matter_codec::Tag::Anonymous, &value).expect("writing to vec should not fail");
+
             let value = match attr {
                 $(
-                    matc::clusters::defs::$attr_id => Self::$field_enum_variant {
-                        $field_name: matc::clusters::codec::$cluster_mod::$decode_fn(value)?.into()
+                    matter_clusters::r#gen::$cluster::attribute_id::$attr_id => Self::$field_enum_variant {
+                        $field_name: {
+                            let value = matter_clusters::r#gen::$cluster::$decode_fn(&tlv_bytes)?;
+                            crate::device::clusters::define_cluster_macro::transform_field!(value $(=> $transform)?)
+                        }
                     }
                 ),*,
                 _ => return Err(anyhow::anyhow!("unkown attr"))
@@ -71,4 +100,4 @@ mod backend_impl {
     }
 }
 
-pub(crate) use define_cluster;
+pub(crate) use {define_cluster, transform_field};

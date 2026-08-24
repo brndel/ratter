@@ -20,6 +20,7 @@ pub enum LightControlColor {
     HueSaturation { hue: u8, saturation: u8 },
     Temperature { temperature: u16 },
     Xy { x: u16, y: u16 },
+    Unkown,
 }
 
 pub struct LightControlClusters<'a> {
@@ -65,21 +66,23 @@ impl<'a> From<LightControlClusters<'a>> for LightControl {
                         .temperature
                         .map_or(200, |temperature| *temperature.color_temperature_mireds),
                 },
+                ColorControlMode::Unkown => LightControlColor::Unkown,
             },
         }
     }
 }
 
 impl LightControl {
-    fn set_color_action(&self) -> ColorControlAction {
+    fn set_color_action(&self) -> Option<ColorControlAction> {
         match self.color {
             LightControlColor::HueSaturation { hue, saturation } => {
-                ColorControlAction::SetHueSaturation { hue, saturation }
+                Some(ColorControlAction::SetHueSaturation { hue, saturation })
             }
             LightControlColor::Temperature { temperature } => {
-                ColorControlAction::SetColorTemperature { temperature }
+                Some(ColorControlAction::SetColorTemperature { temperature })
             }
-            LightControlColor::Xy { x, y } => ColorControlAction::SetXY { x, y },
+            LightControlColor::Xy { x, y } => Some(ColorControlAction::SetXY { x, y }),
+            LightControlColor::Unkown => None,
         }
     }
 }
@@ -92,10 +95,14 @@ impl crate::backend::EnableDisableChangeAction for LightControl {
         use dioxus::logger::tracing::info;
 
         info!("enable!");
-        vec![
-            self.set_color_action().into(),
-            LevelControlAction::SetLevelOnOff { level: self.level }.into(),
-        ]
+        if let Some(color_action) = self.set_color_action() {
+            vec![
+                color_action.into(),
+                LevelControlAction::SetLevelOnOff { level: self.level }.into(),
+            ]
+        } else {
+            vec![LevelControlAction::SetLevelOnOff { level: self.level }.into()]
+        }
     }
 
     fn disable_action(&self) -> Vec<EndpointAction> {
@@ -114,7 +121,9 @@ impl crate::backend::EnableDisableChangeAction for LightControl {
         }
 
         if old.color != new.color {
-            actions.push(new.set_color_action().into());
+            if let Some(color_action) = new.set_color_action() {
+                actions.push(color_action.into());
+            }
         }
 
         actions

@@ -4,9 +4,9 @@ use crate::device::clusters::{Clusters, ElectricalEnergyMeasurement, ElectricalP
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ElectricalSensorParams {
-    pub voltage: u8,
-    pub active_power: u32,
-    pub total_energy_imported: u64,
+    pub voltage: i64,
+    pub active_power: i64,
+    pub total_energy_imported: i64,
 }
 
 pub struct ElectricalSensorParamsClusters<'a> {

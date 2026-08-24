@@ -15,14 +15,16 @@ pub enum AttrChange {
 
 #[cfg(feature = "backend")]
 mod impl_from_attr {
-    use super::*;
+    use matter_codec::Value;
+
+use super::*;
     use crate::backend::{ClusterState, FromAttr, FromAttrChange};
 
     impl FromAttr for AttrChange {
         fn from_attr(
             cluster: u32,
             attr: u32,
-            value: &matc::tlv::TlvItemValue,
+            value: &Value,
         ) -> anyhow::Result<Self> {
             let change = match cluster {
                 <PowerSourceChange as ChangeEvent>::State::CLUSTER_ID => {

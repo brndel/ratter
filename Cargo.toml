@@ -10,6 +10,11 @@ backend.path = "backend"
 shared-core.path = "shared-core"
 matc = { path = "rust-matc", features = ["ble"] }
 
+matter-controller = { version = "0.7.1", features = ["ble"]}
+matter-clusters = "0.4.1"
+matter-interaction = "0.4.1"
+matter-codec = "0.3.1"
+
 dioxus = { version = "0.7.9", features = ["router", "fullstack"] }
 dioxus-html = { version = "0.7.9", features = ["serialize"]}
 dioxus-stores = { version = "0.7.9" }

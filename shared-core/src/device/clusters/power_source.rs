@@ -1,14 +1,15 @@
 #[cfg(feature = "backend")]
-use matc::clusters::codec::power_source_cluster::BatCommonDesignation;
+use matter_clusters::r#gen::power_source::BatCommonDesignationEnum;
+use matter_clusters::types::Nullable;
 use serde::{Deserialize, Serialize};
 
 use crate::device::clusters::{ChangeEvent, define_cluster_macro::define_cluster};
 
 define_cluster!(
-struct PowerSource, enum PowerSourceChange, power_source_cluster, CLUSTER_ID_POWER_SOURCE {
-    bat_quantity: u8 => CLUSTER_POWER_SOURCE_ATTR_ID_BATQUANTITY as BatQuantity { read_bat_quantity, decode_bat_quantity },
-    bat_percent_remaining: Option<u8> => CLUSTER_POWER_SOURCE_ATTR_ID_BATPERCENTREMAINING as BatPercentRemaining { read_bat_percent_remaining, decode_bat_percent_remaining },
-    bat_kind: BatteryKind => CLUSTER_POWER_SOURCE_ATTR_ID_BATCOMMONDESIGNATION as BatDesignation { read_bat_common_designation, decode_bat_common_designation }
+struct PowerSource, enum PowerSourceChange, power_source {
+    bat_quantity: u8 => BAT_QUANTITY as BatQuantity { decode_bat_quantity },
+    bat_percent_remaining: Option<u8> => BAT_PERCENT_REMAINING as BatPercentRemaining { decode_bat_percent_remaining => Nullable::value },
+    bat_kind: BatteryKind => BAT_COMMON_DESIGNATION as BatDesignation { decode_bat_common_designation }
 }
 );
 
@@ -21,12 +22,12 @@ pub enum BatteryKind {
 }
 
 #[cfg(feature = "backend")]
-impl From<BatCommonDesignation> for BatteryKind {
-    fn from(value: BatCommonDesignation) -> Self {
+impl From<BatCommonDesignationEnum> for BatteryKind {
+    fn from(value: BatCommonDesignationEnum) -> Self {
         match value {
-            BatCommonDesignation::Unspecified => Self::Unspecified,
-            BatCommonDesignation::Aaa => Self::AAA,
-            BatCommonDesignation::Aa => Self::AA,
+            BatCommonDesignationEnum::Unspecified => Self::Unspecified,
+            BatCommonDesignationEnum::Aaa => Self::AAA,
+            BatCommonDesignationEnum::Aa => Self::AA,
             _ => Self::Other,
         }
     }

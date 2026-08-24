@@ -78,7 +78,7 @@ pub fn LightControlView(
                     if color_control().temperature.is_some() {
                         TabBarItem { value: ColorControlMode::Temperature, "Temp" }
                     }
-                    // TabBarItem { value: ColorControlMode::Xy, "Xy" }
+                                // TabBarItem { value: ColorControlMode::Xy, "Xy" }
                 }
 
                 match *color_control().color_mode {
@@ -90,7 +90,12 @@ pub fn LightControlView(
                                     r#type: "range",
                                     oninput: move |ev| {
                                         if let Some(value) = ev.value().parse().ok() {
-                                            color_control.with_mut(|control| if let Some(hue_saturation) = &mut control.hue_saturation {hue_saturation.current_hue.set_user(value)})
+                                            color_control
+                                                .with_mut(|control| {
+                                                    if let Some(hue_saturation) = &mut control.hue_saturation {
+                                                        hue_saturation.current_hue.set_user(value)
+                                                    }
+                                                })
                                         }
                                     },
                                     min: 0,
@@ -104,7 +109,12 @@ pub fn LightControlView(
                                     r#type: "range",
                                     oninput: move |ev| {
                                         if let Some(value) = ev.value().parse().ok() {
-                                            color_control.with_mut(|control| if let Some(hue_saturation) = &mut control.hue_saturation {hue_saturation.current_saturation.set_user(value)})
+                                            color_control
+                                                .with_mut(|control| {
+                                                    if let Some(hue_saturation) = &mut control.hue_saturation {
+                                                        hue_saturation.current_saturation.set_user(value)
+                                                    }
+                                                })
                                         }
                                     },
                                     min: 0,
@@ -125,12 +135,17 @@ pub fn LightControlView(
                                 input {
                                     class: "temperature-slider",
                                     style: "background: linear-gradient(to right in hsl, {
-                                                                    ColorControl::temperature_mireds_to_css_color(*hue_sat.color_temperature_mireds_min, 255)}, {
-                                                                    ColorControl::temperature_mireds_to_css_color(*hue_sat.color_temperature_mireds_max, 255)})",
+                                                                                                    ColorControl::temperature_mireds_to_css_color(*hue_sat.color_temperature_mireds_min, 255)}, {
+                                                                                                    ColorControl::temperature_mireds_to_css_color(*hue_sat.color_temperature_mireds_max, 255)})",
                                     r#type: "range",
                                     oninput: move |ev| {
                                         if let Some(value) = ev.value().parse().ok() {
-                                            color_control.with_mut(|control| if let Some(temperature) = &mut control.temperature {temperature.color_temperature_mireds.set_user(value)})
+                                            color_control
+                                                .with_mut(|control| {
+                                                    if let Some(temperature) = &mut control.temperature {
+                                                        temperature.color_temperature_mireds.set_user(value)
+                                                    }
+                                                })
                                         }
                                     },
                                     min: *hue_sat.color_temperature_mireds_min,
@@ -142,8 +157,9 @@ pub fn LightControlView(
                         } else {
                             rsx! {}
                         }
-                    },
+                    }
                     ColorControlMode::Xy => rsx! { "XY" },
+                    ColorControlMode::Unkown => rsx! { "Unkown" },
                 }
             }
         }

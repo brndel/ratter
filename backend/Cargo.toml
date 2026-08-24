@@ -13,7 +13,10 @@ anyhow.workspace = true
 futures.workspace = true
 derive_more.workspace = true
 
-matc.workspace = true
+matter-controller.workspace = true
+matter-clusters.workspace = true
+matter-interaction.workspace = true
+
 notify.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true

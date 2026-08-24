@@ -1,23 +1,25 @@
-use matc::{controller::Connection, tlv::TlvItemValue};
+
+use matter_codec::Value;
+use matter_controller::Node;
 
 use crate::{
     device::{AttrChange, clusters::ChangeEvent},
     id::EndpointId,
 };
 
-pub trait FromConnection: Sized {
-    fn from_connection(connection: &Connection) -> impl Future<Output = anyhow::Result<Self>>;
+pub trait FromNode: Sized {
+    fn from_node(node: &Node) -> impl Future<Output = anyhow::Result<Self>>;
 }
 
 pub trait FromEndpoint: Sized {
     fn from_endpoint(
-        connection: &Connection,
+        node: &Node,
         endpoint: u16,
     ) -> impl Future<Output = anyhow::Result<Self>>;
 }
 
 pub trait FromAttr: Sized {
-    fn from_attr(cluster: u32, attr: u32, value: &TlvItemValue) -> anyhow::Result<Self>;
+    fn from_attr(cluster: u32, attr: u32, value: &Value) -> anyhow::Result<Self>;
 }
 
 pub trait ClusterState {
@@ -28,7 +30,7 @@ pub trait FromAttrChange: Sized + ChangeEvent
 where
     <Self as ChangeEvent>::State: ClusterState,
 {
-    fn from_attr_change(attr: u32, value: &TlvItemValue) -> anyhow::Result<Self>;
+    fn from_attr_change(attr: u32, value: &Value) -> anyhow::Result<Self>;
 }
 
 pub trait RunAction<Target, Action> {
@@ -47,7 +49,7 @@ pub trait RunClusterAction {
 
     fn run(
         self,
-        connection: &Connection,
+        node: &Node,
         endpoint: EndpointId,
     ) -> impl Future<Output = anyhow::Result<Vec<AttrChange>>>;
 }
