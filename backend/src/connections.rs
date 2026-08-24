@@ -4,7 +4,8 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use dioxus::logger::tracing::{error, info};
 use futures::Stream;
-use matc::{controller::Connection, devman::DeviceManager};
+use matc::{clusters::codec::{admin_commissioning_cluster::open_commissioning_window, operational_credential_cluster::{read_fabrics, remove_fabric}}, controller::Connection, devman::DeviceManager, messages::pake1, onboarding::{OnboardingInfo, encode_manual_pairing_code}};
+use rand::{Rng, RngExt, rand_core::utils::fill_bytes_via_next_word, rngs::ThreadRng};
 use shared_core::{
     asset::asset_registry::AssetRegistry,
     attr_dump::{AttrDump, AttrDumpValue},
@@ -71,6 +72,51 @@ impl Connections {
             node_id,
             ConnectionWrapper::new_from_connection(connection, node_id, self.bus_sender.clone()),
         );
+    }
+
+
+    pub async fn open_commission_window(&self, device: DeviceId) -> Result<String> {
+        let connection = self.get_connection(device).await.ok_or(anyhow!("not connected"))?;
+
+        let mut rng = ThreadRng::default();
+
+        let info = OnboardingInfo {
+            discriminator: rng.random(),
+            passcode: rng.random(),
+            is_short_discriminator: false,
+            vendor_id: None,
+            product_id: None,
+            discovery_capabilities: None,
+        };
+        let iterations = 2000;
+
+
+        let mut salt = [0u8; 32];
+        fill_bytes_via_next_word(&mut salt, || Ok::<_, ()>(rng.next_u32())).unwrap();
+        let key = matc::controller::pin_to_passcode(info.passcode).map_err(|e| anyhow!("{e:?}"))?;
+        let verifier = matc::spake2p::Engine::create_passcode_verifier(&key, &salt, iterations);
+
+        open_commissioning_window(&connection, 0, 100, verifier, info.discriminator, iterations, salt.to_vec()).await?;
+
+        let code = encode_manual_pairing_code(&info);
+
+        Ok(code)
+    }
+
+    pub async fn forget_device(&self, device: DeviceId, cert: &[u8]) -> Result<()> {
+        let connection = self.get_connection(device).await.ok_or(anyhow!("not connected"))?;
+
+        let fabrics = read_fabrics(&connection, 0).await?;
+        
+        let Some((idx, fabric)) = fabrics.into_iter().enumerate().find(|(_, fabric)| fabric.node_id == Some(device) && fabric.root_public_key.as_ref().is_some_and(|key| key == cert)) else {
+            anyhow::bail!("device {device} has no matching fabric");
+        };
+
+        remove_fabric(&connection, 0, idx as u8).await?;
+
+        self.connections.write().await.remove(&device);
+
+        Ok(())
     }
 }
 

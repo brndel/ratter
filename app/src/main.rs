@@ -96,7 +96,7 @@ fn App() -> Element {
 
     rsx! {
         document::Link { rel: "icon", href: FAVICON, sizes: "any" }
-        document::Link { rel: "icon", href: FAVICON_SVG, type: "image/svg+xml" }
+        document::Link { rel: "icon", href: FAVICON_SVG, r#type: "image/svg+xml" }
         document::Link { rel: "stylesheet", href: MAIN_CSS }
         Router::<Route> {}
     }
@@ -143,13 +143,9 @@ fn Navbar() -> Element {
             Link { to: Route::AssetsPage {}, "Assets" }
             Link { to: Route::EndpointsPage {}, "Endpoints" }
 
-            div {
-                class: "spacer"
-            }
+            div { class: "spacer" }
 
-            span {
-                "{connection_state()}"
-            }
+            span { "{connection_state()}" }
         }
 
         Outlet::<Route> {}
@@ -164,9 +160,8 @@ fn DeviceList() -> Element {
 
     rsx! {
 
-        div {
-            class: "list",
-            for (room_id, room) in assets.rooms.iter() {
+        div { class: "list",
+            for (room_id , room) in assets.rooms.iter() {
                 if let Ok(room) = room {
                     h2 {
                         ColorLabel {
@@ -179,7 +174,11 @@ fn DeviceList() -> Element {
                     div { class: "device-list",
                         for device_id in assets.get_devices_in_room(*room_id).into_iter().flatten().cloned() {
                             if let Some(device) = DeviceRegistry::devices_for_store(devices.into()).get(device_id) {
-                                DeviceListEntry { key: "{device_id}", device_id, device }
+                                DeviceListEntry {
+                                    key: "{device_id}",
+                                    device_id,
+                                    device,
+                                }
                             }
                         }
                     }
@@ -203,20 +202,16 @@ fn DeviceListEntry(device_id: u64, device: Store<DeviceInitStatus>) -> Element {
                 Ok("ERROR"),
                 Some(rsx! {
                     PopoverRoot {
-                        PopoverButton {
-                            "View Error"
-                        }
+                        PopoverButton { "View Error" }
                         PopoverContent {
-                            pre {
-                                "{err}"
-                            }
+                            pre { "{err}" }
                         }
                     }
                 }),
             ),
             DeviceInitStatusStoreTransposed::Connected(device) => (
                 Err(rsx! {
-                    for (endpoint_id, endpoint) in device.endpoints().iter() {
+                    for (endpoint_id , endpoint) in device.endpoints().iter() {
                         for device in endpoint.device_types().iter() {
                             DeviceTypeView {
                                 key: "{device}",
@@ -240,11 +235,8 @@ fn DeviceListEntry(device_id: u64, device: Store<DeviceInitStatus>) -> Element {
 
     let header = rsx! {
         if let Some(device) = get_device(device_id) {
-            h2 {
-                {device.config.name.clone()}
-            }
-            div {
-                class: "h-list",
+            h2 { {device.config.name.clone()} }
+            div { class: "h-list",
                 if let Some(room_id) = device.config.room && let Some(room) = get_room(room_id) {
                     ColorLabel {
                         color: room.color,
@@ -263,24 +255,22 @@ fn DeviceListEntry(device_id: u64, device: Store<DeviceInitStatus>) -> Element {
                         ColorLabel {
                             color: 0x222222,
                             text: "unkown label {label}",
-                            style: ColorLabelStyle::Label
+                            style: ColorLabelStyle::Label,
                         }
                     }
                 }
             }
         } else {
-            h2 {
-                "<Device name not found>"
-            }
+            h2 { "<Device name not found>" }
         }
     };
+
+    let mut commission_code = use_signal(|| None);
 
     rsx! {
         div { class: "device-list-entry", key: "{device_id}",
             DialogRoot {
-                DialogButton {
-                    {header.clone()}
-                }
+                DialogButton { {header.clone()} }
                 DialogContent {
                     {header}
 
@@ -290,28 +280,49 @@ fn DeviceListEntry(device_id: u64, device: Store<DeviceInitStatus>) -> Element {
 
                     button {
                         onclick: move |_| async move {
+                            commission_code.set(Some("…".to_string()));
+                            let code = open_commission_window(device_id).await;
+                            match code {
+                                Ok(code) => commission_code.set(Some(code)),
+                                Err(err) => commission_code.set(Some(format!("{err:?}"))),
+                            }
+                        },
+                        "Open commissioning"
+                    }
+                    if let Some(code) = commission_code() {
+                        "{code}"
+                    }
+
+                    button {
+                        onclick: move |_| async move {
                             let _ = reconnect_device(device_id).await;
                         },
                         "Reconnect"
+                    }
+
+                    DialogRoot {
+                        DialogButton { "Forget device" }
+                        DialogContent {
+                            button {
+                                onclick: move |_| async move {
+                                    forget_device(device_id).await.unwrap();
+                                },
+                                "Yes, im sure and want to forget the device forever"
+                            }
+                        }
                     }
                 }
             }
 
             match status_text {
                 Ok(text) => rsx! {
-                    div {
-                        class: "device-list-entry-status-text",
-                        "{text}"
-                    }
+                    div { class: "device-list-entry-status-text", "{text}" }
                 },
                 Err(view) => rsx! {
-                    div {
-                        class: "device-list-entry-quickoptions",
-                        {view}
-                    }
+                    div { class: "device-list-entry-quickoptions", {view} }
                 },
             }
-
+        
         }
     }
 }
@@ -353,7 +364,12 @@ fn EndpointView(device_id: u64, endpoint_id: EndpointId, endpoint: Store<Endpoin
             if has_identify_cluster() {
                 button {
                     onclick: move |_| async move {
-                        let _ = run_action(device_id, endpoint_id, EndpointAction::Identify(IdentifyAction::Identify)).await;
+                        let _ = run_action(
+                                device_id,
+                                endpoint_id,
+                                EndpointAction::Identify(IdentifyAction::Identify),
+                            )
+                            .await;
                     },
                     "identify"
                 }
@@ -412,8 +428,7 @@ fn DeviceTypeView(
             // Extended Color Light
             rsx! {
                 PopoverRoot {
-                    PopoverButton {
-                        hide_button: true,
+                    PopoverButton { hide_button: true,
                         div {
                             class: "color-block",
                             class: if !*on_off.read().is_on { "is-off" },
@@ -430,30 +445,24 @@ fn DeviceTypeView(
                                 control_light(device_id, endpoint_id, control).await.unwrap()
                             },
                         }
-
+                    
                     }
                 }
             }
         }
         0x0107 if let Some(params) = occupancy_sensor() => {
             rsx! {
-                pre {
-                    "{params:#?}"
-                }
+                pre { "{params:#?}" }
             }
         }
         0x0510 if let Some(params) = electrical_sensor() => {
             rsx! {
-                pre {
-                    "{params:#?}"
-                }
+                pre { "{params:#?}" }
             }
         }
         0x0011 if let Some(params) = power_source() => {
             rsx! {
-                pre {
-                    "{params:#?}"
-                }
+                pre { "{params:#?}" }
             }
         }
         _ => rsx! {},
@@ -470,6 +479,23 @@ async fn reconnect_device(device_id: u64) -> Result<(), ServerFnError> {
 
     Ok(())
 }
+
+
+#[post("/api/open_commission_window", matter: MatterManagerExt)]
+async fn open_commission_window(device_id: u64) -> Result<String, ServerFnError> {
+    let code = matter.open_commission_window(device_id).await?;
+
+    Ok(code)
+}
+
+
+#[post("/api/forget_device", matter: MatterManagerExt)]
+async fn forget_device(device_id: u64) -> Result<(), ServerFnError> {
+    matter.forget_device(device_id).await?;
+
+    Ok(())
+}
+
 
 #[post("/api/action", matter: MatterManagerExt)]
 async fn run_action(

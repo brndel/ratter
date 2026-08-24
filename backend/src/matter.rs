@@ -4,8 +4,7 @@ use anyhow::{Result, anyhow};
 use dioxus::logger::tracing::info;
 use futures::Stream;
 use matc::{
-    NetworkCreds,
-    devman::{DeviceManager, ManagerConfig},
+    NetworkCreds, clusters::codec::admin_commissioning_cluster::open_basic_commissioning_window, devman::{DeviceManager, ManagerConfig},
 };
 use rand::{Rng, rngs::ThreadRng};
 use tokio::{fs, sync::RwLock, time::interval};
@@ -15,14 +14,10 @@ use shared_core::{
         asset_registry::AssetRegistry,
         device::{DeviceAsset, DeviceAssetConfig},
         scene::SceneInRoom,
-    },
-    attr_dump::AttrDump,
-    backend::RunAction,
-    device::{
+    }, attr_dump::AttrDump, backend::RunAction, device::{
         DeviceCommissionMode, EndpointAction, EndpointTarget, device_controls::LightControl,
         device_registry::DeviceRegistry,
-    },
-    id::AssetId,
+    }, id::{AssetId, DeviceId},
 };
 
 use crate::{
@@ -93,6 +88,19 @@ impl MatterManager {
             .clone()
             .commission_device(pairing_code, device_asset, mode)
             .await
+    }
+
+
+    pub async fn open_commission_window(&self, device: DeviceId) -> Result<String> {
+        self.0.connections.open_commission_window(device).await
+    }
+
+    pub async fn forget_device(&self, device: DeviceId) -> Result<()> {
+        let cert = self.0.device_manager.certmanager().get_ca_cert()?;
+        self.0.connections.forget_device(device, &cert).await?;
+        self.0.device_manager.remove_device(device)?;
+
+        Ok(())
     }
 
     pub async fn dump_all_attrs(
