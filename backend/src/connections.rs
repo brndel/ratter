@@ -93,7 +93,7 @@ impl Connections {
         let mut rng = ThreadRng::default();
 
         let info = OnboardingInfo {
-            discriminator: rng.random::<u16>() & 0x0FFF,
+            discriminator: rng.random::<u16>() & 0x0F00,
             passcode: rng.random_range(1..=99_999_998),
             is_short_discriminator: false,
             vendor_id: None,
@@ -330,30 +330,70 @@ impl Connections {
 
 #[cfg(test)]
 mod tests {
+use matc::onboarding::decode_manual_pairing_code;
 use matter_commissioning::parse_manual_code;
 
 use super::*;
 
     #[test]
     fn encode_decode_pairing_code() {
+        // let (passcode, salt, discriminator) = random_window_secrets().unwrap();
+        let (passcode, discriminator) = (20_202_021, 0x0100);
+
         let payload = SetupPayload {
             version: 0,
             vendor_id: None,
             product_id: None,
             commissioning_flow: CommissioningFlow::Standard,
             discovery_capabilities: DiscoveryCapabilities::ON_NETWORK,
-            discriminator: Discriminator::new(512).unwrap(),
-            passcode: Passcode::new(91431302).unwrap(),
+            discriminator: Discriminator::new(discriminator).unwrap(),
+            passcode: Passcode::new(passcode).unwrap(),
         };
         let code = encode_manual_code(&payload);
-        println!("{code}");
+        println!("code: '{code}' with passcode '{passcode}' and disc: '{discriminator}'");
         let onboarding = parse_manual_code(&code).unwrap();
 
+        let onboarding_matc = decode_manual_pairing_code(&code).unwrap();
+
         assert_eq!(
-            onboarding.discriminator, payload.discriminator
+            payload.discriminator.as_u16(), onboarding.discriminator.as_u16()
         );
         assert_eq!(
-            onboarding.passcode, payload.passcode
+            payload.passcode.as_u32(), onboarding.passcode.as_u32()
         );
     }
+}
+
+
+/// Generate a valid `(passcode, salt, discriminator)` for an enhanced window.
+///
+/// Passcode is a fresh 27-bit value with the spec's trivial values excluded;
+/// salt is 32 random bytes; discriminator is a random 12-bit value.
+///
+/// # Errors
+/// Returns [`Error::Operational`] if the system RNG fails or no valid passcode
+/// is found within the retry budget (practically never — ~12 values excluded).
+pub(crate) fn random_window_secrets() -> Result<(u32, [u8; 32], u16), anyhow::Error> {
+    use matter_commissioning::setup::Passcode;
+    let rng = |buf: &mut [u8]| {
+        matter_crypto::random_bytes(buf).map_err(|e| anyhow!("rng: {e}"))
+    };
+    let mut salt = [0u8; 32];
+    rng(&mut salt)?;
+    let mut db = [0u8; 2];
+    rng(&mut db)?;
+    let discriminator = u16::from_le_bytes(db) & 0x0FFF;
+    // Passcode: draw 27-bit values until one is spec-valid (Passcode::new rejects
+    // out-of-range and the disallowed-trivial set).
+    for _ in 0..64 {
+        let mut pb = [0u8; 4];
+        rng(&mut pb)?;
+        let candidate = u32::from_le_bytes(pb) & 0x07FF_FFFF; // 27-bit
+        if Passcode::new(candidate).is_ok() {
+            return Ok((candidate, salt, discriminator));
+        }
+    }
+    Err(anyhow!(
+        "could not generate a valid passcode"
+    ))
 }
