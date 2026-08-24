@@ -6,7 +6,7 @@
 let
   shell = import ./shell.nix { inherit pkgs; };
 in
-pkgs.rustPlatform.buildRustPackage {
+  shell.rust-platform.buildRustPackage {
   pname = "ratter";
   version = "0.1.0";
 

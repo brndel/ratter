@@ -37,6 +37,10 @@ let
 in
 {
   inherit tools;
+  rust-platform = pkgs.makeRustPlatform {
+    cargo = rustShellToolchain;
+    rustc = rustShellToolchain;
+  };
   shell = pkgs.mkShell {
     name = "dioxus";
     packages = tools;
