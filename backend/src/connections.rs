@@ -4,7 +4,17 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use dioxus::logger::tracing::{error, info};
 use futures::Stream;
-use matc::{clusters::codec::{admin_commissioning_cluster::open_commissioning_window, operational_credential_cluster::{read_fabrics, remove_fabric}}, controller::Connection, devman::DeviceManager, messages::pake1, onboarding::{OnboardingInfo, encode_manual_pairing_code}};
+use matc::{
+    clusters::codec::{
+        admin_commissioning_cluster::open_commissioning_window,
+        operational_credential_cluster::{read_fabrics, remove_fabric},
+    },
+    controller::Connection,
+    devman::DeviceManager,
+    messages::pake1,
+    onboarding::{OnboardingInfo, encode_manual_pairing_code},
+};
+use matter_commissioning::{CommissioningFlow, DiscoveryCapabilities, Discriminator, Passcode, SetupPayload, encode_manual_code};
 use rand::{Rng, RngExt, rand_core::utils::fill_bytes_via_next_word, rngs::ThreadRng};
 use shared_core::{
     asset::asset_registry::AssetRegistry,
@@ -74,15 +84,17 @@ impl Connections {
         );
     }
 
-
     pub async fn open_commission_window(&self, device: DeviceId) -> Result<String> {
-        let connection = self.get_connection(device).await.ok_or(anyhow!("not connected"))?;
+        let connection = self
+            .get_connection(device)
+            .await
+            .ok_or(anyhow!("not connected"))?;
 
         let mut rng = ThreadRng::default();
 
         let info = OnboardingInfo {
             discriminator: rng.random::<u16>() & 0x0FFF,
-            passcode: rng.random::<u32>() & 0x07FF_FFFF,
+            passcode: rng.random_range(1..=99_999_998),
             is_short_discriminator: false,
             vendor_id: None,
             product_id: None,
@@ -90,25 +102,62 @@ impl Connections {
         };
         let iterations = 2000;
 
-
         let mut salt = [0u8; 32];
         fill_bytes_via_next_word(&mut salt, || Ok::<_, ()>(rng.next_u32())).unwrap();
         let key = matc::controller::pin_to_passcode(info.passcode).map_err(|e| anyhow!("{e:?}"))?;
         let verifier = matc::spake2p::Engine::create_passcode_verifier(&key, &salt, iterations);
 
-        open_commissioning_window(&connection, 0, 100, verifier, info.discriminator, iterations, salt.to_vec()).await?;
+        let matter_controller_verifier = matter_crypto::pake_passcode_verifier(info.passcode, &salt, iterations)?;
+
+        if verifier.as_slice() != matter_controller_verifier.as_ref() {
+            info!("verifiers do not match!!");
+        }
+
+        open_commissioning_window(
+            &connection,
+            0,
+            100,
+            verifier,
+            info.discriminator,
+            iterations,
+            salt.to_vec(),
+        )
+        .await?;
 
         let code = encode_manual_pairing_code(&info);
+        let code_of_other_crate = encode_manual_code(&SetupPayload {
+            version: 0,
+            vendor_id: None,
+            product_id: None,
+            commissioning_flow: CommissioningFlow::Standard,
+            discovery_capabilities: DiscoveryCapabilities::ON_NETWORK,
+            discriminator: Discriminator::new(info.discriminator).unwrap(),
+            passcode: Passcode::new(info.passcode).unwrap(),
+        });
+
+        info!(
+            "opened commissioning window on discriminator '{}' and code '{}' (code of matter-controller: '{}')",
+            info.discriminator, code, code_of_other_crate
+        );
 
         Ok(code)
     }
 
     pub async fn forget_device(&self, device: DeviceId, cert: &[u8]) -> Result<()> {
-        let connection = self.get_connection(device).await.ok_or(anyhow!("not connected"))?;
+        let connection = self
+            .get_connection(device)
+            .await
+            .ok_or(anyhow!("not connected"))?;
 
         let fabrics = read_fabrics(&connection, 0).await?;
-        
-        let Some((idx, fabric)) = fabrics.into_iter().enumerate().find(|(_, fabric)| fabric.node_id == Some(device) && fabric.root_public_key.as_ref().is_some_and(|key| key == cert)) else {
+
+        let Some((idx, fabric)) = fabrics.into_iter().enumerate().find(|(_, fabric)| {
+            fabric.node_id == Some(device)
+                && fabric
+                    .root_public_key
+                    .as_ref()
+                    .is_some_and(|key| key == cert)
+        }) else {
             anyhow::bail!("device {device} has no matching fabric");
         };
 
