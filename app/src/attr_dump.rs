@@ -4,6 +4,7 @@ use crate::MatterManagerExt;
 use anyhow::anyhow;
 use dioxus::{fullstack::ServerEvents, prelude::*};
 use futures::StreamExt;
+use jiff::Timestamp;
 use shared_core::attr_dump::{AttrDump, AttrDumpContainer};
 
 #[component]
@@ -55,10 +56,10 @@ async fn dump_attrs(device: u64, include_root_endpoint: bool, skip_errors: bool)
 
         fs::create_dir_all(format!("attr_dump/{}", device)).unwrap();
 
-        let now = Local::now();
+        let now = Timestamp::now();
 
         fs::write(
-            format!("attr_dump/{}/{}.txt", device, now.to_rfc3339()),
+            format!("attr_dump/{}/{}.txt", device, now.to_string()),
             container.to_string(),
         )
         .unwrap()
