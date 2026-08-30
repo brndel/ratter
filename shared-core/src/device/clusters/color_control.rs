@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::device::clusters::{ChangeEvent, define_cluster_macro::define_cluster};
+use crate::device::clusters::ChangeEvent;
 
 // define_cluster!(
 // struct ColorControl, enum ColorControlChange, color_control, CLUSTER_ID_COLOR_CONTROL {
@@ -150,12 +150,12 @@ impl ChangeEvent for ColorControlChange {
 mod backend_impl {
     use matter_clusters::r#gen::color_control::{self, ColorCapabilitiesBitmap};
     use matter_codec::{TlvWriter, Value};
-    use matter_controller::{Node, ReadPath};
+    use matter_controller::Node;
 
     use crate::read_decode;
 
     impl crate::backend::ClusterState for super::ColorControl {
-        const CLUSTER_ID: u32 = matc::clusters::defs::CLUSTER_ID_COLOR_CONTROL;
+        const CLUSTER_ID: u32 = matter_clusters::r#gen::color_control::CLUSTER_ID;
     }
     impl crate::backend::FromEndpoint for super::ColorControl {
         async fn from_endpoint(node: &Node, endpoint: u16) -> anyhow::Result<Self> {
@@ -242,27 +242,27 @@ mod backend_impl {
         fn from_attr_change(attr: u32, value: &Value) -> anyhow::Result<Self> {
             let mut tlv_bytes = Vec::new();
             let mut writer = TlvWriter::new(&mut tlv_bytes);
-            writer.write_value(matter_codec::Tag::Anonymous, &value);
+            writer.write_value(matter_codec::Tag::Anonymous, &value).unwrap();
 
             let value = match attr {
-                matc::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_CURRENTHUE => {
+                matter_clusters::r#gen::color_control::attribute_id::CURRENT_HUE => {
                     Self::SetCurrentHue {
                         current_hue: color_control::decode_current_hue(&tlv_bytes)?.into(),
                     }
                 }
-                matc::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_CURRENTSATURATION => {
+                matter_clusters::r#gen::color_control::attribute_id::CURRENT_SATURATION => {
                     Self::SetCurrentSaturation {
                         current_saturation: color_control::decode_current_saturation(&tlv_bytes)?
                             .into(),
                     }
                 }
-                matc::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_CURRENTX => Self::SetCurrentX {
+                matter_clusters::r#gen::color_control::attribute_id::CURRENT_X => Self::SetCurrentX {
                     current_x: color_control::decode_current_x(&tlv_bytes)?.into(),
                 },
-                matc::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_CURRENTY => Self::SetCurrentY {
+                matter_clusters::r#gen::color_control::attribute_id::CURRENT_Y => Self::SetCurrentY {
                     current_y: color_control::decode_current_y(&tlv_bytes)?.into(),
                 },
-                matc::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_COLORTEMPERATUREMIREDS => {
+                matter_clusters::r#gen::color_control::attribute_id::COLOR_TEMPERATURE_MIREDS => {
                     Self::SetColorTemperatureMireds {
                         color_temperature_mireds: color_control::decode_color_temperature_mireds(
                             &tlv_bytes,
@@ -270,7 +270,7 @@ mod backend_impl {
                         .into(),
                     }
                 }
-                matc::clusters::defs::CLUSTER_COLOR_CONTROL_ATTR_ID_COLORMODE => {
+                matter_clusters::r#gen::color_control::attribute_id::COLOR_MODE => {
                     Self::SetColorMode {
                         color_mode: color_control::decode_color_mode(&tlv_bytes)?.into(),
                     }
@@ -358,7 +358,7 @@ mod impl_action {
                         node,
                         endpoint,
                         color_control,
-                        MOVE_TO_HUE_AND_SATURATION,
+                        MOVE_TO_COLOR,
                         encode_move_to_color(
                             x,
                             y,
@@ -383,7 +383,7 @@ mod impl_action {
                         node,
                         endpoint,
                         color_control,
-                        MOVE_TO_HUE_AND_SATURATION,
+                        MOVE_TO_COLOR_TEMPERATURE,
                         encode_move_to_color_temperature(
                             temperature,
                             0,

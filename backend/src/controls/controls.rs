@@ -18,7 +18,7 @@ use shared_core::{
 use tokio::spawn;
 
 use crate::{
-    connections::Connections, controls::SceneStack, event_bus::EventBusSender,
+    node_connections::NodeConnections, controls::SceneStack, event_bus::EventBusSender,
     read_only::ReadOnlyArc,
 };
 
@@ -26,12 +26,12 @@ pub struct Controls {
     user_controls: BTreeMap<EndpointTarget, LightControl>,
     scene_stack: SceneStack,
     device_registry: ReadOnlyArc<DeviceRegistry>,
-    connections: Connections,
+    connections: NodeConnections,
 }
 
 impl Controls {
     pub fn new(
-        connections: Connections,
+        connections: NodeConnections,
         asset_registry: ReadOnlyArc<AssetRegistry>,
         device_registry: ReadOnlyArc<DeviceRegistry>,
         bus: EventBusSender,

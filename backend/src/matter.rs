@@ -6,31 +6,25 @@ use futures::Stream;
 
 use jiff::Timestamp;
 use matter_controller::{
-    AttestationTrust, FabricConfig, FabricInfo, FileStore, MatterController, MatterTime, ThreadDataset,
+    AttestationTrust, FabricConfig, FileStore, MatterController, MatterTime, OpenWindowOpts,
+    ThreadDataset,
 };
-use tokio::{fs, sync::RwLock};
+use tokio::{
+    fs, sync::{RwLock, mpsc::channel}, time::{interval, sleep},
+};
 
 use shared_core::{
     asset::{
         asset_registry::AssetRegistry,
         device::{DeviceAsset, DeviceAssetConfig},
         scene::SceneInRoom,
-    },
-    attr_dump::AttrDump,
-    backend::RunAction,
-    device::{
-        DeviceCommissionMode, EndpointAction, EndpointTarget, device_controls::LightControl,
-        device_registry::DeviceRegistry,
-    },
-    id::AssetId,
+    }, attr_dump::AttrDump, backend::RunAction, device::{
+        DeviceCommissionMode, EndpointAction, EndpointTarget, device_controls::LightControl, device_registry::{DeviceInitStatus, DeviceRegistry},
+    }, event::DeviceEvent, id::{AssetId, DeviceId},
 };
 
 use crate::{
-    asset::AssetWatcher,
-    connections::Connections,
-    controls::Controls,
-    event_bus::{EventBus, EventBusListener},
-    read_only::ReadOnlyArc,
+    asset::AssetWatcher, controls::Controls, event_bus::{EventBus, EventBusListener}, node_connections::{NodeConnections, NodeEventKind}, read_only::ReadOnlyArc,
 };
 
 #[derive(Clone)]
@@ -40,10 +34,11 @@ struct MatterManagerInner {
     controller: MatterController,
     device_registry: Arc<RwLock<DeviceRegistry>>,
     asset_registry: Arc<RwLock<AssetRegistry>>,
+    #[expect(unused)]
     asset_watcher: Arc<AssetWatcher>,
     controls: Arc<RwLock<Controls>>,
     event_bus: EventBus,
-    connections: Connections,
+    connections: NodeConnections,
     thread_dataset: RwLock<Option<Vec<u8>>>,
 }
 
@@ -74,14 +69,27 @@ impl MatterManager {
         Ok(())
     }
 
-    #[deprecated]
     pub async fn reconnect_device(&self, device_id: u64) -> Result<()> {
-        // self.0
-        //     .connections
-        //     .connect_to_device(self.0.controller.clone(), device_id, true)
-        //     .await;
+        let node = self.0.controller.node(device_id);
+
+        self.0.connections.add_node(node, true).await;
 
         Ok(())
+    }
+
+    pub async fn open_commissioning_window(&self, device: DeviceId) -> Result<String> {
+        let window = self
+            .0
+            .controller
+            .node(device)
+            .open_commissioning_window(OpenWindowOpts::default())
+            .await?;
+
+        if let Some(qr_code) = window.qr_code {
+            Ok(format!("{}, {}", window.manual_code, qr_code))
+        } else {
+            Ok(window.manual_code)
+        }
     }
 
     pub async fn commission_device(
@@ -120,10 +128,6 @@ impl MatterManager {
         Ok(())
     }
 
-    // pub async fn reload_assets(&self) {
-    //     self.0.asset_registry.write().await.reload().await;
-    // }
-
     pub async fn get_assets(&self) -> AssetRegistry {
         self.0.asset_registry.read().await.clone()
     }
@@ -159,7 +163,35 @@ impl MatterManagerInner {
         let device_registry = Arc::new(RwLock::new(DeviceRegistry::new()));
         let asset_registry = Arc::new(RwLock::new(AssetRegistry::new()));
 
-        let connections = Connections::new(event_bus.sender(), asset_registry.clone());
+        let connections = {
+            let bus_sender = event_bus.sender();
+
+            let (tx, mut rx) = channel(32);
+            let connections = NodeConnections::new(tx);
+
+            tokio::spawn(async move {
+                while let Some(ev) = rx.recv().await {
+                    let event = match ev.event {
+                        NodeEventKind::WaitingToConnect => DeviceEvent::InitStatusChange { status: DeviceInitStatus::Waiting },
+                        NodeEventKind::Connecting => DeviceEvent::InitStatusChange { status: DeviceInitStatus::Connecting },
+                        NodeEventKind::Subscribing => DeviceEvent::InitStatusChange { status: DeviceInitStatus::StartingListeners },
+                        NodeEventKind::ReadDeviceInfo => DeviceEvent::InitStatusChange { status: DeviceInitStatus::Initializing },
+                        NodeEventKind::Connected(device) => DeviceEvent::InitStatusChange { status: DeviceInitStatus::Connected(device) },
+                        NodeEventKind::Error(error) => DeviceEvent::InitStatusChange { status: DeviceInitStatus::Error(error.to_string(), Timestamp::now()) },
+                        NodeEventKind::AttrChange(attr_change_event) => DeviceEvent::AttrChange { event: attr_change_event },
+                        NodeEventKind::Event(event) => DeviceEvent::Event { event },
+                        NodeEventKind::Disconnected => DeviceEvent::InitStatusChange { status: DeviceInitStatus::Disconnected },
+                    };
+
+                    bus_sender.send(shared_core::event::Event::Device {
+                        device: ev.node_id,
+                        event,
+                    });
+                }
+            });
+
+            connections
+        };
 
         let device_controls = Arc::new(RwLock::new(Controls::new(
             connections.clone(),
@@ -176,16 +208,33 @@ impl MatterManagerInner {
             )
         });
 
-        // let mut reconnect_interval = interval(Duration::from_secs(5 * 60)); // Try reconnecting every 5 minutes
+        let mut reconnect_interval = interval(Duration::from_secs(10 * 60)); // Try reconnecting every 10 minutes
 
         tokio::spawn({
             let connections = connections.clone();
             let controller = device_manager.clone();
 
             async move {
-                for node_info in controller.nodes().await.unwrap() {
-                    let node = controller.node(node_info.node_id);
-                    connections.add_node(node).await;
+                let mut is_first = true;
+                
+                loop {
+                    reconnect_interval.tick().await;
+                    info!("reconnecting all devices in need of reconnecting");
+                    
+                    let nodes = controller.nodes().await.unwrap().into_iter().map(|info| info.node_id);
+                    // let nodes = [9, 40, 43, 2, 3].iter().cloned();
+
+                    if is_first {
+                        info!("emitting waiting status for all devices");
+                        connections.emit_waiting_status(nodes.clone()).await;
+                        is_first = false;
+                    }
+    
+                    for node_id in nodes {
+                        let node = controller.node(node_id);
+                        connections.add_node(node, false).await;
+                        sleep(Duration::from_secs(2)).await;
+                    }
                 }
             }
         });
@@ -216,48 +265,31 @@ impl MatterManagerInner {
     async fn load_or_init_device_manager() -> Result<MatterController> {
         tokio::fs::create_dir_all("./data").await?;
 
-        let controller = MatterController::builder(Arc::new(FileStore::new("./data/matter_controller")))
-            .attestation_trust(AttestationTrust::from_dirs("certs/paa-root-certs".as_ref(), "certs/cd-certs".as_ref())?)
-            .build()
-            .await?;
+        let controller =
+            MatterController::builder(Arc::new(FileStore::new("./data/matter_controller.bin")))
+                .attestation_trust(AttestationTrust::from_dirs(
+                    "certs/paa-root-certs".as_ref(),
+                    "certs/cd-certs".as_ref(),
+                )?)
+                .build()
+                .await?;
 
         if controller.fabrics().await?.is_empty() {
             let now_unix = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)?
                 .as_secs();
-            controller.create_fabric(FabricConfig::new(
-                1,
-                1,
-                1,
-                (
-                    MatterTime::from_unix_secs(now_unix - Duration::from_hours(1).as_secs()),
-                    MatterTime::NO_EXPIRY,
-                ),
-            )).await?;
+            controller
+                .create_fabric(FabricConfig::new(
+                    1,
+                    1,
+                    1,
+                    (
+                        MatterTime::from_unix_secs(now_unix - Duration::from_hours(1).as_secs()),
+                        MatterTime::NO_EXPIRY,
+                    ),
+                ))
+                .await?;
         }
-
-        // match DeviceManager::load(path).await {
-        //     Ok(manager) => Ok(manager),
-        //     Err(err) => {
-        //         let mut rng = ThreadRng::default();
-        //         let fabric_id = rng.next_u64();
-        //         let controller_id = rng.next_u64();
-
-        //         info!(
-        //             "could not load DeviceManager, creating new manager with fabric_id {fabric_id} and controller_id {controller_id}... ({err:?})"
-        //         );
-
-        //         DeviceManager::create(
-        //             path,
-        //             ManagerConfig {
-        //                 fabric_id,
-        //                 controller_id,
-        //                 local_address: "[::]:5555".to_string(),
-        //             },
-        //         )
-        //         .await
-        //     }
-        // }
 
         Ok(controller)
     }
@@ -268,22 +300,6 @@ impl MatterManagerInner {
         device_asset: DeviceAssetConfig,
         mode: DeviceCommissionMode,
     ) -> Result<u64> {
-        // let node_id = {
-        //     /// Reserve nodes 0x0001 to 0x0100 for use of ratter
-        //     const MIN_NODE_ID: u64 = 0x0000_0000_0000_0100;
-        //     /// Maximum operational node id (matter spec chapter 6.5.6.3.)
-        //     const MAX_NODE_ID: u64 = 0xFFFF_FFEF_FFFF_FFFF;
-        //     let mut rng = ThreadRng::default();
-
-        //     loop {
-        //         let id = rng.random_range(MIN_NODE_ID..=MAX_NODE_ID);
-
-        //         if self.controller.get_device(id)?.is_none() {
-        //             break id;
-        //         }
-        //     }
-        // };
-
         info!(
             "Starting commission for device {} with code '{}'",
             device_asset.name, pairing_code
@@ -331,7 +347,7 @@ impl MatterManagerInner {
 
         tokio::spawn({
             async move {
-                self.connections.add_node(node).await;
+                self.connections.add_node(node, false).await;
             }
         });
 

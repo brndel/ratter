@@ -7,10 +7,10 @@ use shared_core::{
 };
 use tokio::sync::RwLock;
 
-use crate::{connections::Connections, controls::Controls};
+use crate::{node_connections::NodeConnections, controls::Controls};
 
 pub struct AutomationActionRunner {
-    pub connections: Connections,
+    pub connections: NodeConnections,
     pub controls: Arc<RwLock<Controls>>,
 }
 

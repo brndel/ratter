@@ -402,7 +402,6 @@ button.on-off-button {
     }
 
     .popover-content {
-        position: absolute;
         position-anchor: --popover;
         position-area: right;
         background-color: #181b21;
@@ -419,7 +418,7 @@ button.on-off-button {
 }
 
 .dialog-root {
-    .dialog-content:popover-open {
+    .dialog-content:open {
         display: flex;
         flex-direction: column;
         align-self: center;

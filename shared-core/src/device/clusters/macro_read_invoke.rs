@@ -11,7 +11,7 @@ macro_rules! invoke {
 
 #[macro_export]
 macro_rules! read_decode {
-    ($node:ident, $endpoint:ident, [$($var_name:ident = {$cluster:ident, $attribute_id:ident, $decode_fn:ident}),*]) => {
+    ($node:ident, $endpoint:expr, [$($var_name:ident = {$cluster:ident, $attribute_id:ident, $decode_fn:ident}),*]) => {
         #[allow(unused_parens)]
         let ($($var_name),*) = {
             let values = $node.read(&[

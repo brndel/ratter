@@ -4,6 +4,7 @@ mod light_control;
 mod page;
 mod server_state;
 
+use jiff::{Zoned, tz::{Offset, TimeZone}};
 use page::*;
 use shared_core::{
     asset::{device::DeviceAsset, label::Label, room::Room},
@@ -35,13 +36,11 @@ use shared_core::{
 };
 
 use crate::{
-    component::{
+    attr_dump::AttrDumpView, component::{
         color_label::{ColorLabel, ColorLabelStyle},
         dialog_button::{DialogButton, DialogContent, DialogRoot},
         popover_button::{PopoverButton, PopoverContent, PopoverRoot},
-    },
-    light_control::LightControlView,
-    server_state::ServerState,
+    }, light_control::LightControlView, server_state::ServerState,
 };
 
 #[derive(Debug, Clone, Routable, PartialEq)]
@@ -194,13 +193,15 @@ fn DeviceListEntry(device_id: u64, device: Store<DeviceInitStatus>) -> Element {
 
     let (status_text, content): (Result<&'static str, Element>, Option<Element>) =
         match device.transpose() {
+            DeviceInitStatusStoreTransposed::Waiting => (Ok("waiting…"), None),
             DeviceInitStatusStoreTransposed::Connecting => (Ok("connecting…"), None),
             DeviceInitStatusStoreTransposed::Initializing => (Ok("initializing…"), None),
             DeviceInitStatusStoreTransposed::StartingListeners => (Ok("starting listeners…"), None),
             DeviceInitStatusStoreTransposed::Disconnected => (Ok("disconnected…"), None),
-            DeviceInitStatusStoreTransposed::Error(err) => (
+            DeviceInitStatusStoreTransposed::Error(err, timestamp) => (
                 Ok("ERROR"),
                 Some(rsx! {
+                    div { {Zoned::new(*timestamp.read(), TimeZone::system()).to_string()} }
                     PopoverRoot {
                         PopoverButton { "View Error" }
                         PopoverContent {
@@ -265,6 +266,8 @@ fn DeviceListEntry(device_id: u64, device: Store<DeviceInitStatus>) -> Element {
         }
     };
 
+    let mut commission_code = use_signal(String::new);
+
     rsx! {
         div { class: "device-list-entry", key: "{device_id}",
             DialogRoot {
@@ -281,6 +284,31 @@ fn DeviceListEntry(device_id: u64, device: Store<DeviceInitStatus>) -> Element {
                             let _ = reconnect_device(device_id).await;
                         },
                         "Reconnect"
+                    }
+
+                    button {
+                        onclick: move |_| async move {
+                            commission_code.set("…".to_string());
+                            match open_window(device_id).await {
+                                Ok(code) => {
+                                    commission_code.set(code);
+                                }
+                                Err(err) => {
+                                    commission_code.set(format!("Error: {err}"));
+                                }
+                            };
+                        },
+                        "open recommission window"
+                    }
+                    if !commission_code().is_empty() {
+                        "{commission_code}"
+                    }
+
+                    DialogRoot {
+                        DialogButton { "dump attrs" }
+                        DialogContent {
+                            AttrDumpView { device: device_id, include_root: true }
+                        }
                     }
                 }
             }
@@ -451,6 +479,14 @@ async fn reconnect_device(device_id: u64) -> Result<(), ServerFnError> {
     Ok(())
 }
 
+
+#[post("/api/open_window", matter: MatterManagerExt)]
+async fn open_window(device_id: u64) -> Result<String, ServerFnError> {
+    let code = matter.open_commissioning_window(device_id).await?;
+
+    Ok(code)
+}
+
 #[post("/api/action", matter: MatterManagerExt)]
 async fn run_action(
     device: u64,
@@ -463,6 +499,8 @@ async fn run_action(
 
     Ok(())
 }
+
+
 
 #[post("/api/light", matter: MatterManagerExt)]
 async fn control_light(

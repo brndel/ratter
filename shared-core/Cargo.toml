@@ -16,11 +16,10 @@ jiff.workspace = true
 derive_more = { workspace = true, features = ["as_ref"] }
 toml.workspace = true
 
-matc = { workspace = true, optional = true }
 matter-controller = { workspace = true, optional = true }
 matter-clusters.workspace = true
 matter-codec = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
 
 [features]
-backend = [ "dep:matc", "dep:matter-controller", "dep:matter-codec", "dep:tokio" ]
+backend = [ "dep:matter-controller", "dep:matter-codec", "dep:tokio" ]

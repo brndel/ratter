@@ -23,7 +23,12 @@ pub fn DialogButton(children: Element, #[props(default)] hide_button: bool) -> E
 
     if let Some(ctx) = ctx {
         rsx! {
-            button { popovertarget: "dialog-{ctx.id}", class: if hide_button { "hidden-button" }, {children} }
+            button {
+                "command": "show-modal",
+                "commandfor": "dialog-{ctx.id}",
+                class: if hide_button { "hidden-button" },
+                {children}
+            }
         }
     } else {
         rsx! { "No ctx" }
@@ -52,10 +57,10 @@ pub fn DialogContent(children: Element) -> Element {
 
     if let Some(ctx) = ctx {
         rsx! {
-            div {
-                popover: "",
+            dialog {
                 id: "dialog-{ctx.id}",
                 class: "dialog-content",
+                "closedby": "any",
                 ontoggle,
                 if is_open() {
                     {children}

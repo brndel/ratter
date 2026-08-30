@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     asset::{asset_registry::AssetRegistry, automation::condition::AutomationCondition},
     device::{
-        AttrChange, ClusterEvent, EndpointAction, EndpointTarget, device_registry::DeviceRegistry,
+        AttrChange, EndpointAction, EndpointTarget, device_registry::DeviceRegistry,
     },
     event::{AttrChangeEvent, DeviceEvent, Event},
     id::{AssetId, DeviceId},
@@ -84,9 +84,7 @@ impl Automation {
                         };
                         let triggers = trigger.iter().any(|trigger| {
                             let right_target = trigger.target.contains_endpoint(endpoint, assets);
-                            let right_action = match (&trigger.action, &event.event) {
-                                (TriggerAction::Button, ClusterEvent::Button) => true,
-                            };
+                            let right_action = trigger.action == event.event;
 
                             right_target && right_action
                         });

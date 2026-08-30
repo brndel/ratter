@@ -5,6 +5,7 @@ use dioxus::{
     signals::WriteSignal,
 };
 use dioxus_stores::Store;
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -19,12 +20,13 @@ pub struct DeviceRegistry {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Store)]
 pub enum DeviceInitStatus {
+    Waiting,
     Connecting,
     Initializing,
     StartingListeners,
     Connected(Device),
     Disconnected,
-    Error(String),
+    Error(String, Timestamp),
 }
 
 impl DeviceRegistry {

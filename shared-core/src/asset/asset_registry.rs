@@ -227,8 +227,7 @@ impl AssetRegistry {
 mod asset_registry_write {
     use std::path::PathBuf;
 
-    use jiff::Timestamp;
-use tokio::fs;
+    use tokio::fs;
 
     use crate::backend::DirectoryAsset;
 

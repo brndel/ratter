@@ -27,7 +27,6 @@ pub enum DeviceCommissionMode {
 #[cfg(feature = "backend")]
 mod impl_from_traits {
     use anyhow;
-    use matc::controller::Connection;
     use matter_controller::Node;
 
     use super::*;
