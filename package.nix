@@ -14,7 +14,12 @@ in
     src = ./.;
     filter = path: type: !(pkgs.lib.hasSuffix ".nix" (builtins.baseNameOf path));
   };
-  cargoLock.lockFile = ./Cargo.lock;
+  cargoLock = {
+    lockFile = ./Cargo.lock;
+    outputHashes = {
+      "matter-bdx-0.3.1" = "sha256-qR3ok9dMxt074+67mPcha1Ss1KirFeFFMxWdz5KiqqA=";
+    };
+  };
 
   nativeBuildInputs =
     with pkgs;

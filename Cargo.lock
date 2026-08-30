@@ -5480,7 +5480,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "backend",
- "chrono",
  "derive_more 2.1.1",
  "dioxus",
  "dioxus-free-icons",

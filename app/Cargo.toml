@@ -20,7 +20,6 @@ derive_more.workspace = true
 shared-core.workspace = true
 backend = { workspace = true, optional = true }
 
-chrono.workspace = true
 rand.workspace = true
 itertools.workspace = true
 jiff.workspace = true
