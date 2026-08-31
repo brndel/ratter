@@ -4,7 +4,7 @@ use crate::device::clusters::{ChangeEvent, define_cluster_macro::define_cluster}
 
 define_cluster!(
 struct OnOff, enum OnOffChange, on_off {
-    is_on: bool => ON_OFF as OnOff { decode_on_off }
+    is_on: bool => ON_OFF "listen" as OnOff { decode_on_off }
 }
 );
 

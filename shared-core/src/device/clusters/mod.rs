@@ -32,7 +32,11 @@ use serde::{Deserialize, Serialize};
 pub use switch::*;
 pub use temperature_measurement::*;
 
-use crate::{device::attr_change::AttrChange, event::AttrChangeSource, id::ClusterId};
+use crate::{
+    device::attr_change::AttrChange,
+    event::AttrChangeSource,
+    id::{AttrId, ClusterId},
+};
 
 #[derive(
     Debug, Clone, Default, Serialize, Deserialize, Store, derive_more::AsRef, derive_more::AsMut,
@@ -52,10 +56,10 @@ pub struct Clusters {
     pub cluster_ids: Vec<ClustersClusterId>,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClustersClusterId {
     pub id: ClusterId,
-    pub is_handled: bool,
+    pub listen_attrs: Option<Vec<AttrId>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -183,54 +187,77 @@ mod impl_from_endpoint {
             let mut result = Self::default();
 
             for cluster in clusters {
-                let mut is_handled = true;
+                let mut listen_attrs = None;
+
                 match cluster {
                     PowerSource::CLUSTER_ID => {
-                        let target = <Clusters as AsMut<Option<PowerSource>>>::as_mut(&mut result);
-                        *target = Some(PowerSource::from_endpoint(node, endpoint).await?)
+                        result.power_scoure =
+                            Some(PowerSource::from_endpoint(node, endpoint).await?);
+                        listen_attrs = Some(PowerSource::LISTEN_ATTRS)
                     }
                     OnOff::CLUSTER_ID => {
-                        result.on_off = Some(OnOff::from_endpoint(node, endpoint).await?)
+                        result.on_off = Some(OnOff::from_endpoint(node, endpoint).await?);
+                        listen_attrs = Some(OnOff::LISTEN_ATTRS)
                     }
                     LevelControl::CLUSTER_ID => {
                         result.level_control =
-                            Some(LevelControl::from_endpoint(node, endpoint).await?)
+                            Some(LevelControl::from_endpoint(node, endpoint).await?);
+
+                        listen_attrs = Some(LevelControl::LISTEN_ATTRS)
                     }
                     ColorControl::CLUSTER_ID => {
                         result.color_control =
-                            Some(ColorControl::from_endpoint(node, endpoint).await?)
+                            Some(ColorControl::from_endpoint(node, endpoint).await?);
+
+                        listen_attrs = Some(ColorControl::LISTEN_ATTRS)
                     }
                     OccupancySensing::CLUSTER_ID => {
                         result.occupancy_sensing =
-                            Some(OccupancySensing::from_endpoint(node, endpoint).await?)
+                            Some(OccupancySensing::from_endpoint(node, endpoint).await?);
+
+                        listen_attrs = Some(OccupancySensing::LISTEN_ATTRS)
                     }
                     Identify::CLUSTER_ID => {
-                        result.identify = Some(Identify::from_endpoint(node, endpoint).await?)
+                        result.identify = Some(Identify::from_endpoint(node, endpoint).await?);
+
+                        listen_attrs = Some(Identify::LISTEN_ATTRS)
                     }
                     ElectricalPowerMeasurement::CLUSTER_ID => {
                         result.electrical_power_measurement =
-                            Some(ElectricalPowerMeasurement::from_endpoint(node, endpoint).await?)
+                            Some(ElectricalPowerMeasurement::from_endpoint(node, endpoint).await?);
+
+                        listen_attrs = Some(ElectricalPowerMeasurement::LISTEN_ATTRS)
                     }
                     ElectricalEnergyMeasurement::CLUSTER_ID => {
                         result.electrical_energy_measurement =
-                            Some(ElectricalEnergyMeasurement::from_endpoint(node, endpoint).await?)
+                            Some(ElectricalEnergyMeasurement::from_endpoint(node, endpoint).await?);
+
+                        listen_attrs = Some(ElectricalEnergyMeasurement::LISTEN_ATTRS)
                     }
                     Switch::CLUSTER_ID => {
-                        result.switch = Some(Switch::from_endpoint(node, endpoint).await?)
+                        result.switch = Some(Switch::from_endpoint(node, endpoint).await?);
+
+                        listen_attrs = Some(Switch::LISTEN_ATTRS)
                     }
                     TemperatureMeasurement::CLUSTER_ID => {
-                        result.temperature_measurement = Some(TemperatureMeasurement::from_endpoint(node, endpoint).await?)
+                        result.temperature_measurement =
+                            Some(TemperatureMeasurement::from_endpoint(node, endpoint).await?);
+
+                        listen_attrs = Some(TemperatureMeasurement::LISTEN_ATTRS)
                     }
                     RelativeHumidityMeasurement::CLUSTER_ID => {
-                        result.relative_humidity_measurement = Some(RelativeHumidityMeasurement::from_endpoint(node, endpoint).await?)
+                        result.relative_humidity_measurement =
+                            Some(RelativeHumidityMeasurement::from_endpoint(node, endpoint).await?);
+
+                        listen_attrs = Some(RelativeHumidityMeasurement::LISTEN_ATTRS)
                     }
-                    _ => {
-                        is_handled = false;
-                    }
+                    _ => {}
                 }
+
                 result.cluster_ids.push(ClustersClusterId {
                     id: cluster,
-                    is_handled,
+                    listen_attrs: listen_attrs
+                        .map(|attrs| attrs.iter().cloned().filter_map(|x| x).collect()),
                 });
             }
 

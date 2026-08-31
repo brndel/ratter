@@ -10,10 +10,19 @@ macro_rules! transform_field {
     };
 }
 
+macro_rules! filter_listen {
+    ($cluster:ident $attr_id:ident $listen:literal) => {
+        Some(matter_clusters::r#gen::$cluster::attribute_id::$attr_id)
+    };
+    ($cluster:ident $attr_id:ident) => {
+        None
+    }
+}
+
 
 macro_rules! define_cluster {
     (struct $struct_name:ident, enum $enum_name:ident, $cluster:ident {
-        $($field_name:ident : $field_ty:ty => $attr_id:ident as $field_enum_variant:ident { $decode_fn:ident $(=> $transform:path)? }),*
+        $($field_name:ident : $field_ty:ty => $attr_id:ident $($listen:literal)? as $field_enum_variant:ident { $decode_fn:ident $(=> $transform:path)? }),*
     }) => {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -21,6 +30,14 @@ pub struct $struct_name {
     $(
         pub $field_name: crate::device::clusters::DeviceValue<$field_ty>
     ),*
+}
+
+impl $struct_name {
+    pub const LISTEN_ATTRS: &'static [Option<u32>] = &[
+        $(
+            crate::device::clusters::define_cluster_macro::filter_listen!($cluster $attr_id $($listen)?)
+        ),*
+    ];
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -100,4 +117,4 @@ mod backend_impl {
     }
 }
 
-pub(crate) use {define_cluster, transform_field};
+pub(crate) use {define_cluster, transform_field, filter_listen};

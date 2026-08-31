@@ -8,7 +8,7 @@ use crate::device::clusters::{ChangeEvent, define_cluster_macro::define_cluster}
 define_cluster!(
 struct PowerSource, enum PowerSourceChange, power_source {
     bat_quantity: u8 => BAT_QUANTITY as BatQuantity { decode_bat_quantity },
-    bat_percent_remaining: Option<u8> => BAT_PERCENT_REMAINING as BatPercentRemaining { decode_bat_percent_remaining => Nullable::value },
+    bat_percent_remaining: Option<u8> => BAT_PERCENT_REMAINING "listen" as BatPercentRemaining { decode_bat_percent_remaining => Nullable::value },
     bat_kind: BatteryKind => BAT_COMMON_DESIGNATION as BatDesignation { decode_bat_common_designation }
 }
 );

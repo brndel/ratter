@@ -24,6 +24,12 @@ pub struct ColorControl {
     pub color_mode: crate::device::clusters::DeviceValue<ColorControlMode>,
 }
 
+impl ColorControl {
+    pub const LISTEN_ATTRS: &'static [Option<u32>] = const {
+        use matter_clusters::r#gen::color_control::attribute_id::*;
+        &[Some(COLOR_MODE), Some(CURRENT_HUE), Some(CURRENT_SATURATION), Some(COLOR_TEMPERATURE_MIREDS), Some(CURRENT_X), Some(CURRENT_Y)]};
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct ColorControlFeatureHueSat {
     pub current_hue: crate::device::clusters::DeviceValue<u8>,
@@ -242,7 +248,9 @@ mod backend_impl {
         fn from_attr_change(attr: u32, value: &Value) -> anyhow::Result<Self> {
             let mut tlv_bytes = Vec::new();
             let mut writer = TlvWriter::new(&mut tlv_bytes);
-            writer.write_value(matter_codec::Tag::Anonymous, &value).unwrap();
+            writer
+                .write_value(matter_codec::Tag::Anonymous, &value)
+                .unwrap();
 
             let value = match attr {
                 matter_clusters::r#gen::color_control::attribute_id::CURRENT_HUE => {
@@ -256,12 +264,16 @@ mod backend_impl {
                             .into(),
                     }
                 }
-                matter_clusters::r#gen::color_control::attribute_id::CURRENT_X => Self::SetCurrentX {
-                    current_x: color_control::decode_current_x(&tlv_bytes)?.into(),
-                },
-                matter_clusters::r#gen::color_control::attribute_id::CURRENT_Y => Self::SetCurrentY {
-                    current_y: color_control::decode_current_y(&tlv_bytes)?.into(),
-                },
+                matter_clusters::r#gen::color_control::attribute_id::CURRENT_X => {
+                    Self::SetCurrentX {
+                        current_x: color_control::decode_current_x(&tlv_bytes)?.into(),
+                    }
+                }
+                matter_clusters::r#gen::color_control::attribute_id::CURRENT_Y => {
+                    Self::SetCurrentY {
+                        current_y: color_control::decode_current_y(&tlv_bytes)?.into(),
+                    }
+                }
                 matter_clusters::r#gen::color_control::attribute_id::COLOR_TEMPERATURE_MIREDS => {
                     Self::SetColorTemperatureMireds {
                         color_temperature_mireds: color_control::decode_color_temperature_mireds(
@@ -379,7 +391,7 @@ mod impl_action {
                     ])
                 }
                 ColorControlAction::SetColorTemperature { temperature } => {
-                                        invoke!(
+                    invoke!(
                         node,
                         endpoint,
                         color_control,

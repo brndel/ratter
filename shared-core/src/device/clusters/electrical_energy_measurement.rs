@@ -4,7 +4,7 @@ use crate::device::clusters::{ChangeEvent, define_cluster_macro::define_cluster}
 
 define_cluster!(
     struct ElectricalEnergyMeasurement, enum ElectricalEnergyMeasurementChange, electrical_energy_measurement {
-        cumulative_energy_imported: ElectricalEnergy => CUMULATIVE_ENERGY_IMPORTED as SetCumulativeEnergyImported { decode_cumulative_energy_imported }
+        cumulative_energy_imported: ElectricalEnergy => CUMULATIVE_ENERGY_IMPORTED "listen" as SetCumulativeEnergyImported { decode_cumulative_energy_imported }
     }
 );
 

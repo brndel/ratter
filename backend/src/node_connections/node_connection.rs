@@ -6,12 +6,10 @@ use std::sync::{
 use dioxus::logger::tracing::info;
 use matter_controller::{AttributeReport, EventPath, Node, ReadPath};
 use shared_core::{
-    backend::{FromAttr, FromNode},
-    device::{
+    backend::{FromAttr, FromNode}, device::{
         AttrChange, ClusterEvent, Device,
         device_registry::{DeviceConnectionStage, DeviceSubscriptionStatus},
-    },
-    event::{ActionEvent, AttrChangeEvent, AttrChangeSource, DeviceEvent},
+    }, event::{ActionEvent, AttrChangeEvent, AttrChangeSource, DeviceEvent}, id::{AttrId, ClusterId, EndpointId},
 };
 use tokio::sync::Semaphore;
 use tokio_util::sync::{CancellationToken, DropGuard};
@@ -92,30 +90,21 @@ impl NodeConnection {
             .await;
         let device = Device::from_node(&node).await?;
 
-        let clusters = device.endpoints.iter().flat_map(|(endpoint_id, endpoint)| {
-            endpoint
-                .clusters
-                .cluster_ids
-                .iter()
-                .cloned()
-                .filter(|id| id.is_handled)
-                .map(move |cluster| (*endpoint_id, cluster.id))
-        });
+        let attr_ids = Self::attr_ids_from_device(&device);
 
-        let read_paths = clusters
+        let read_paths = attr_ids
             .clone()
-            .map(|(endpoint, cluster)| ReadPath::cluster(endpoint, cluster))
+            .flat_map(|(endpoint, cluster, attr_ids)| attr_ids.into_iter().map(move |attr| ReadPath::concrete(endpoint, cluster, attr)))
             .collect::<Vec<_>>();
 
-        let event_paths = clusters
-            .clone()
-            .map(|(endpoint, cluster)| EventPath::cluster(endpoint, cluster))
+        let event_paths = attr_ids
+            .map(|(endpoint, cluster, _)| EventPath::cluster(endpoint, cluster))
             .collect::<Vec<_>>();
 
         tx.send_connection_stage(DeviceConnectionStage::StartingListeners)
             .await;
 
-        let mut sub = node.subscribe(&read_paths, &event_paths, 1, 30).await?;
+        let mut sub = node.subscribe(&read_paths, &event_paths, 0, 60).await?;
 
         tokio::spawn({
             let node_id = node.node_id();
@@ -195,6 +184,19 @@ impl NodeConnection {
             endpoint: report.path.endpoint,
             source: AttrChangeSource::Device,
             change,
+        })
+    }
+
+
+    fn attr_ids_from_device(device: &Device) -> impl Iterator<Item = (EndpointId, ClusterId, impl Iterator<Item = AttrId>)> + Clone {
+        device.endpoints.iter().flat_map(|(endpoint_id, endpoint)| {
+            let clusters_with_attr_ids = endpoint
+                .clusters
+                .cluster_ids
+                .iter()
+                .filter_map(|id| id.listen_attrs.as_ref().map(|attrs| (id.id, attrs)));
+
+            clusters_with_attr_ids.map(move |(cluster_id, attr_ids)| (*endpoint_id, cluster_id, attr_ids.iter().cloned()))
         })
     }
 }

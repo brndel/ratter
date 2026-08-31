@@ -1,4 +1,3 @@
-
 use serde::{Deserialize, Serialize};
 
 use crate::device::clusters::{ChangeEvent, define_cluster_macro::define_cluster};
@@ -7,7 +6,7 @@ define_cluster!(
 struct LevelControl, enum LevelControlChange, level_control {
     min_level: u8 => MIN_LEVEL as SetMinLevel { decode_min_level },
     max_level: u8 => MAX_LEVEL as SetMaxLevel { decode_max_level },
-    level: Option<u8> => CURRENT_LEVEL as SetLevel { decode_current_level => matter_clusters::types::Nullable::value }
+    level: Option<u8> => CURRENT_LEVEL "listen" as SetLevel { decode_current_level => matter_clusters::types::Nullable::value }
 }
 );
 
@@ -53,7 +52,6 @@ mod impl_action {
                         )
                     )
                     .await?;
-
 
                     Ok(vec![
                         LevelControlChange::SetLevel { level: Some(level) }.into(),

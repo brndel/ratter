@@ -5,7 +5,7 @@ use crate::device::clusters::{ChangeEvent, define_cluster_macro::define_cluster}
 
 define_cluster!(
 struct OccupancySensing, enum OccupancySensingChange, occupancy_sensing {
-    is_occupied: bool => OCCUPANCY as Occupancy { decode_occupancy => transform_is_occupied }
+    is_occupied: bool => OCCUPANCY "listen" as Occupancy { decode_occupancy => transform_is_occupied }
 }
 );
 
