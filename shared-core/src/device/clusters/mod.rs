@@ -4,11 +4,14 @@ mod electrical_energy_measurement;
 mod electrical_power_measurement;
 mod identify;
 mod level_control;
+mod macro_read_invoke;
 mod names;
 mod occupancy_sensing;
 mod on_off;
 mod power_source;
-mod macro_read_invoke;
+mod relative_humidity_measurement;
+mod switch;
+mod temperature_measurement;
 
 use std::ops::Deref;
 
@@ -18,13 +21,16 @@ pub use electrical_energy_measurement::*;
 pub use electrical_power_measurement::*;
 pub use identify::*;
 pub use level_control::*;
+#[cfg(feature = "backend")]
+pub use macro_read_invoke::{invoke, read_decode};
 pub use names::get_cluster_name;
 pub use occupancy_sensing::*;
 pub use on_off::*;
 pub use power_source::*;
-#[cfg(feature = "backend")]
-pub use macro_read_invoke::{invoke, read_decode};
+pub use relative_humidity_measurement::*;
 use serde::{Deserialize, Serialize};
+pub use switch::*;
+pub use temperature_measurement::*;
 
 use crate::{device::attr_change::AttrChange, event::AttrChangeSource, id::ClusterId};
 
@@ -40,6 +46,9 @@ pub struct Clusters {
     pub identify: Option<Identify>,
     pub electrical_power_measurement: Option<ElectricalPowerMeasurement>,
     pub electrical_energy_measurement: Option<ElectricalEnergyMeasurement>,
+    pub switch: Option<Switch>,
+    pub temperature_measurement: Option<TemperatureMeasurement>,
+    pub relative_humidity_measurement: Option<RelativeHumidityMeasurement>,
     pub cluster_ids: Vec<ClustersClusterId>,
 }
 
@@ -135,6 +144,21 @@ impl Clusters {
                     change.apply(state, source)
                 }
             }
+            AttrChange::Switch(change) => {
+                if let Some(state) = self.as_mut() {
+                    change.apply(state, source)
+                }
+            }
+            AttrChange::TemperatureMeasurement(change) => {
+                if let Some(state) = self.as_mut() {
+                    change.apply(state, source)
+                }
+            }
+            AttrChange::RelativeHumidityMeasurement(change) => {
+                if let Some(state) = self.as_mut() {
+                    change.apply(state, source)
+                }
+            }
         }
     }
 }
@@ -142,20 +166,20 @@ impl Clusters {
 #[cfg(feature = "backend")]
 mod impl_from_endpoint {
     use super::*;
-    use crate::{backend::{ClusterState, FromEndpoint}, read_decode};
-use matter_controller::Node;
+    use crate::{
+        backend::{ClusterState, FromEndpoint},
+        read_decode,
+    };
+    use matter_controller::Node;
 
     impl FromEndpoint for Clusters {
-        async fn from_endpoint(
-            node: &Node,
-            endpoint: u16,
-        ) -> anyhow::Result<Self> {
+        async fn from_endpoint(node: &Node, endpoint: u16) -> anyhow::Result<Self> {
             read_decode!(
                 node, endpoint, [
                     clusters = {descriptor, SERVER_LIST, decode_server_list}
                 ]
             );
-            
+
             let mut result = Self::default();
 
             for cluster in clusters {
@@ -184,15 +208,21 @@ use matter_controller::Node;
                         result.identify = Some(Identify::from_endpoint(node, endpoint).await?)
                     }
                     ElectricalPowerMeasurement::CLUSTER_ID => {
-                        result.electrical_power_measurement = Some(
-                            ElectricalPowerMeasurement::from_endpoint(node, endpoint).await?,
-                        )
+                        result.electrical_power_measurement =
+                            Some(ElectricalPowerMeasurement::from_endpoint(node, endpoint).await?)
                     }
                     ElectricalEnergyMeasurement::CLUSTER_ID => {
-                        result.electrical_energy_measurement = Some(
-                            ElectricalEnergyMeasurement::from_endpoint(node, endpoint)
-                                .await?,
-                        )
+                        result.electrical_energy_measurement =
+                            Some(ElectricalEnergyMeasurement::from_endpoint(node, endpoint).await?)
+                    }
+                    Switch::CLUSTER_ID => {
+                        result.switch = Some(Switch::from_endpoint(node, endpoint).await?)
+                    }
+                    TemperatureMeasurement::CLUSTER_ID => {
+                        result.temperature_measurement = Some(TemperatureMeasurement::from_endpoint(node, endpoint).await?)
+                    }
+                    RelativeHumidityMeasurement::CLUSTER_ID => {
+                        result.relative_humidity_measurement = Some(RelativeHumidityMeasurement::from_endpoint(node, endpoint).await?)
                     }
                     _ => {
                         is_handled = false;

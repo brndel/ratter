@@ -118,6 +118,9 @@ input {
     gap: 8pt;
 
     .device-list-entry {
+        display: flex;
+        flex-direction: column;
+        gap: 4pt;
         background-color: #1e222d;
         border-radius: 8pt;
         padding: 4pt;

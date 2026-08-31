@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use dioxus::logger::tracing::error;
 use shared_core::{
     asset::{asset_registry::AssetRegistry, automation::AutomationState},
-    device::device_registry::{DeviceInitStatus, DeviceRegistry},
+    device::device_registry::DeviceRegistry,
     event::{ActionEvent, AssetEvent, AttrChangeEvent, DeviceEvent, Event},
     id::AssetId,
 };
@@ -52,13 +52,6 @@ impl EventBusSender {
         });
     }
 
-    pub fn send_device_init_status(&self, device_id: u64, status: DeviceInitStatus) {
-        self.send(Event::Device {
-            device: device_id,
-            event: DeviceEvent::InitStatusChange { status },
-        });
-    }
-
     pub fn send_attr_change(&self, device_id: u64, event: AttrChangeEvent) {
         self.send(Event::Device {
             device: device_id,
@@ -99,8 +92,8 @@ impl EventBusListener {
                             let mut registry = device_registry.write().await;
                             registry.handle_event(*device, event.clone());
 
-                            if let DeviceEvent::InitStatusChange {
-                                status: DeviceInitStatus::Connected(device_data),
+                            if let DeviceEvent::Connected {
+                                device: device_data
                             } = &event
                             {
                                 let mut assets = asset_registry.write().await;

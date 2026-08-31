@@ -1,0 +1,42 @@
+.cluster-display-text {
+    width: 42pt;
+    height: 42pt;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6pt;
+    font-size: 8pt;
+
+    background-color: #131316;
+    color: white;
+    border: 2pt solid #2a2a35;
+    border-radius: 4pt;
+    text-align: center;
+
+    span.primary {
+        font-weight: bold;
+    }
+
+    span.secondary {
+        color: #ffffffa0;
+    }
+}
+
+.device-card {
+    &.waiting {
+        border: 2pt solid rgb(47, 117, 223);
+    }
+
+    &.connecting {
+        border: 2pt solid rgb(255, 248, 48);
+    }
+
+    &.connected {
+        border: none;
+    }
+
+    &.error {
+        border: 2pt solid rgb(255, 55, 0);
+    }
+}

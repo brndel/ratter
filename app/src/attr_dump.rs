@@ -23,7 +23,6 @@ pub fn AttrDumpView(device: u64, #[props(default)] include_root: bool) -> Elemen
     });
 
     rsx! {
-        h2 { "Dump of Device {device}" }
         pre {
             white_space: "pre-wrap",
             width: "1024pt",

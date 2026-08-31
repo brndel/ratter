@@ -10,7 +10,7 @@ use matter_controller::{
     ThreadDataset,
 };
 use tokio::{
-    fs, sync::{RwLock, mpsc::channel}, time::{interval, sleep},
+    fs, sync::{RwLock, mpsc::channel}, time::interval,
 };
 
 use shared_core::{
@@ -19,12 +19,12 @@ use shared_core::{
         device::{DeviceAsset, DeviceAssetConfig},
         scene::SceneInRoom,
     }, attr_dump::AttrDump, backend::RunAction, device::{
-        DeviceCommissionMode, EndpointAction, EndpointTarget, device_controls::LightControl, device_registry::{DeviceInitStatus, DeviceRegistry},
-    }, event::DeviceEvent, id::{AssetId, DeviceId},
+        DeviceCommissionMode, EndpointAction, EndpointTarget, device_controls::LightControl, device_registry::DeviceRegistry,
+    }, id::{AssetId, DeviceId},
 };
 
 use crate::{
-    asset::AssetWatcher, controls::Controls, event_bus::{EventBus, EventBusListener}, node_connections::{NodeConnections, NodeEventKind}, read_only::ReadOnlyArc,
+    asset::AssetWatcher, controls::Controls, event_bus::{EventBus, EventBusListener}, node_connections::NodeConnections, read_only::ReadOnlyArc,
 };
 
 #[derive(Clone)]
@@ -171,21 +171,9 @@ impl MatterManagerInner {
 
             tokio::spawn(async move {
                 while let Some(ev) = rx.recv().await {
-                    let event = match ev.event {
-                        NodeEventKind::WaitingToConnect => DeviceEvent::InitStatusChange { status: DeviceInitStatus::Waiting },
-                        NodeEventKind::Connecting => DeviceEvent::InitStatusChange { status: DeviceInitStatus::Connecting },
-                        NodeEventKind::Subscribing => DeviceEvent::InitStatusChange { status: DeviceInitStatus::StartingListeners },
-                        NodeEventKind::ReadDeviceInfo => DeviceEvent::InitStatusChange { status: DeviceInitStatus::Initializing },
-                        NodeEventKind::Connected(device) => DeviceEvent::InitStatusChange { status: DeviceInitStatus::Connected(device) },
-                        NodeEventKind::Error(error) => DeviceEvent::InitStatusChange { status: DeviceInitStatus::Error(error.to_string(), Timestamp::now()) },
-                        NodeEventKind::AttrChange(attr_change_event) => DeviceEvent::AttrChange { event: attr_change_event },
-                        NodeEventKind::Event(event) => DeviceEvent::Event { event },
-                        NodeEventKind::Disconnected => DeviceEvent::InitStatusChange { status: DeviceInitStatus::Disconnected },
-                    };
-
                     bus_sender.send(shared_core::event::Event::Device {
                         device: ev.node_id,
-                        event,
+                        event: ev.event,
                     });
                 }
             });
@@ -215,7 +203,6 @@ impl MatterManagerInner {
             let controller = device_manager.clone();
 
             async move {
-                let mut is_first = true;
                 
                 loop {
                     reconnect_interval.tick().await;
@@ -224,24 +211,18 @@ impl MatterManagerInner {
                     let nodes = controller.nodes().await.unwrap().into_iter().map(|info| info.node_id);
                     // let nodes = [9, 40, 43, 2, 3].iter().cloned();
 
-                    if is_first {
-                        info!("emitting waiting status for all devices");
-                        connections.emit_waiting_status(nodes.clone()).await;
-                        is_first = false;
-                    }
-    
-                    for node_id in nodes {
-                        let node = controller.node(node_id);
-                        connections.add_node(node, false).await;
-                        sleep(Duration::from_secs(2)).await;
-                    }
+                    let total_nodes_count = nodes.len();
+
+                    let connected_devices = connections.add_nodes(nodes, &controller, false).await;
+
+                    info!("initiated connection for {} of {} total devices", connected_devices, total_nodes_count);
                 }
             }
         });
 
         let asset_watcher = Arc::new(AssetWatcher::new(event_bus.sender()).watch_all()?);
 
-        let thread_dataset = {
+        let thread_dataset: RwLock<Option<Vec<u8>>> = {
             let dataset = fs::read_to_string("data/thread_dataset")
                 .await
                 .ok()

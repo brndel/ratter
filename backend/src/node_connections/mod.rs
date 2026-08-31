@@ -1,13 +1,18 @@
 mod node_connection;
 mod node_sender;
 
-use std::{collections::BTreeMap, sync::Arc, time::Duration};
+use std::{collections::BTreeMap, sync::Arc};
 
 use dioxus::logger::tracing::{error, info};
 use futures::Stream;
-use matter_controller::Node;
+use matter_controller::{MatterController, Node};
 use shared_core::{
-    attr_dump::{AttrDump, AttrDumpValue}, backend::RunAction, device::{Device, EndpointAction, EndpointTarget}, event::{ActionEvent, AttrChangeEvent, AttrChangeSource}, id::{ClusterId, DeviceId, EndpointId}, read_decode,
+    attr_dump::{AttrDump, AttrDumpValue},
+    backend::RunAction,
+    device::{EndpointAction, EndpointTarget},
+    event::{AttrChangeEvent, AttrChangeSource, DeviceEvent},
+    id::{ClusterId, DeviceId, EndpointId},
+    read_decode,
 };
 use tokio::sync::{
     RwLock, Semaphore, mpsc::{self, Sender},
@@ -21,47 +26,82 @@ use anyhow::anyhow;
 #[derive(Clone)]
 pub struct NodeConnections {
     tx: Sender<NodeConnectionEvent>,
-    connections: Arc<RwLock<BTreeMap<u64, NodeConnection>>>
+    connections: Arc<RwLock<BTreeMap<u64, NodeConnection>>>,
+    connection_semaphore: Arc<Semaphore>
 }
 
 pub struct NodeConnectionEvent {
     pub node_id: DeviceId,
-    pub event: NodeEventKind,
-}
-
-pub enum NodeEventKind {
-    WaitingToConnect,
-    Connecting,
-    Subscribing,
-    ReadDeviceInfo,
-    Connected(Device),
-    Error(anyhow::Error),
-    AttrChange(AttrChangeEvent),
-    Event(ActionEvent),
-    Disconnected,
+    pub event: DeviceEvent,
 }
 
 impl NodeConnections {
     pub fn new(tx: Sender<NodeConnectionEvent>) -> Self {
         Self {
             tx,
-            connections: Default::default()
+            connections: Default::default(),
+            connection_semaphore: Arc::new(Semaphore::new(2))
         }
     }
 
-    pub async fn emit_waiting_status(&self, node_ids: impl Iterator<Item = DeviceId>) {
+    pub async fn add_nodes(
+        &self,
+        node_ids: impl Iterator<Item = DeviceId>,
+        controller: &MatterController,
+        force_reconnect: bool,
+    ) -> usize {
+        let mut added_connections_counter = 1;
+
+        let mut connections: tokio::sync::RwLockWriteGuard<'_, BTreeMap<u64, NodeConnection>> =
+            self.connections.write().await;
+
         for node_id in node_ids {
-            self.tx.send(NodeConnectionEvent { node_id, event: NodeEventKind::WaitingToConnect }).await.unwrap();
+            let node = controller.node(node_id);
+
+            if Self::add_node_internal(
+                &self.tx,
+                &mut connections,
+                node,
+                &self.connection_semaphore,
+                force_reconnect,
+            ) {
+                added_connections_counter += 1;
+            }
         }
+
+        added_connections_counter
     }
 
-    pub async fn add_node(&self, node: Node, force_reconnect: bool) {
+    pub async fn add_node(&self, node: Node, force_reconnect: bool) -> bool {
         let mut connections = self.connections.write().await;
 
-        if force_reconnect || connections.get(&node.node_id()).is_none_or(|connection| connection.allow_timed_reconnect()) {
-            let sender = NodeSender::new(node.node_id(), self.tx.clone());
-    
-            connections.insert(node.node_id(), NodeConnection::new(node, sender));
+        Self::add_node_internal(
+            &self.tx,
+            &mut connections,
+            node,
+            &self.connection_semaphore,
+            force_reconnect,
+        )
+    }
+
+    fn add_node_internal(
+        tx: &Sender<NodeConnectionEvent>,
+        connections: &mut BTreeMap<u64, NodeConnection>,
+        node: Node,
+        semaphore: &Arc<Semaphore>,
+        force_reconnect: bool,
+    ) -> bool {
+        if force_reconnect
+            || connections
+                .get(&node.node_id())
+                .is_none_or(|connection: &NodeConnection| connection.allow_timed_reconnect())
+        {
+            let sender = NodeSender::new(node.node_id(), tx.clone());
+
+            connections.insert(node.node_id(), NodeConnection::new(node, sender, semaphore.clone()));
+            true
+        } else {
+            false
         }
     }
 }
@@ -102,11 +142,13 @@ impl RunAction<EndpointTarget, EndpointAction> for NodeConnections {
                             bus_sender
                                 .send(NodeConnectionEvent {
                                     node_id: target.device,
-                                    event: NodeEventKind::AttrChange(AttrChangeEvent {
-                                        endpoint: target.endpoint,
-                                        source: AttrChangeSource::User,
-                                        change,
-                                    }),
+                                    event: DeviceEvent::AttrChange {
+                                        event: AttrChangeEvent {
+                                            endpoint: target.endpoint,
+                                            source: AttrChangeSource::User,
+                                            change,
+                                        },
+                                    },
                                 })
                                 .await
                                 .unwrap();
@@ -132,7 +174,6 @@ impl NodeConnections {
         let (tx, rx) = mpsc::channel(16);
 
         tokio::spawn(async move {
-
             async fn dump_cluster(
                 tx: &mpsc::Sender<AttrDump>,
                 node: &Node,
@@ -144,7 +185,6 @@ impl NodeConnections {
                 let attributes = node
                     .read(&[matter_controller::ReadPath::cluster(endpoint, cluster)])
                     .await?;
-
 
                 for (attr_path, attr_value) in attributes {
                     tx.send(AttrDump {

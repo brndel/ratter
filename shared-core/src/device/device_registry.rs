@@ -20,13 +20,30 @@ pub struct DeviceRegistry {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Store)]
 pub enum DeviceInitStatus {
-    Waiting,
-    Connecting,
-    Initializing,
+    Connecting {
+        timestamp: Timestamp,
+        stage: DeviceConnectionStage,
+    },
+    Connected {
+        device: Device,
+        subscription_status: Option<DeviceSubscriptionStatus>,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum DeviceConnectionStage {
+    Queued,
     StartingListeners,
-    Connected(Device),
-    Disconnected,
-    Error(String, Timestamp),
+    FetchingDeviceInfo,
+    Error(String),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum DeviceSubscriptionStatus {
+    Lagged { dropped_events: u32 },
+    Established { subscription_id: u32 },
+    Resubscribing { cause: String },
+    Closed,
 }
 
 impl DeviceRegistry {
@@ -36,11 +53,31 @@ impl DeviceRegistry {
 
     pub fn handle_event(&mut self, device_id: u64, event: DeviceEvent) {
         match event {
-            DeviceEvent::InitStatusChange { status } => {
-                self.devices.insert(device_id, status);
+            DeviceEvent::Connecting { timestamp, stage } => {
+                self.devices
+                    .insert(device_id, DeviceInitStatus::Connecting { timestamp, stage });
+            }
+            DeviceEvent::Connected { device } => {
+                self.devices.insert(
+                    device_id,
+                    DeviceInitStatus::Connected {
+                        device,
+                        subscription_status: None,
+                    },
+                );
+            }
+            DeviceEvent::SubscriptionStatus { status } => {
+                if let Some(DeviceInitStatus::Connected {
+                    subscription_status,
+                    ..
+                }) = self.devices.get_mut(&device_id)
+                {
+                    *subscription_status = Some(status)
+                }
             }
             DeviceEvent::AttrChange { event } => {
-                let Some(DeviceInitStatus::Connected(device)) = self.devices.get_mut(&device_id)
+                let Some(DeviceInitStatus::Connected { device, .. }) =
+                    self.devices.get_mut(&device_id)
                 else {
                     warn!("Device {} is not registered / yet ready", device_id);
                     return;
@@ -57,6 +94,7 @@ impl DeviceRegistry {
                 endpoint.clusters.handle_change(event.change, event.source)
             }
             DeviceEvent::Event { event } => {
+                #[cfg(feature = "backend")]
                 info!("Event on device {}: {:?}", device_id, event);
             }
         }
@@ -64,7 +102,7 @@ impl DeviceRegistry {
 
     pub fn get_cluster(&self, endpoint: EndpointTarget) -> Option<&Clusters> {
         let device = match self.devices.get(&endpoint.device) {
-            Some(DeviceInitStatus::Connected(device)) => device,
+            Some(DeviceInitStatus::Connected { device, .. }) => device,
             _ => return None,
         };
 

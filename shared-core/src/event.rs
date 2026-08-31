@@ -1,4 +1,5 @@
 use derive_more::From;
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -10,7 +11,10 @@ use crate::{
         scene::Scene,
         scene_layer::SceneLayer,
     },
-    device::{AttrChange, ClusterEvent, device_registry::DeviceInitStatus},
+    device::{
+        AttrChange, ClusterEvent, Device,
+        device_registry::{DeviceConnectionStage, DeviceSubscriptionStatus},
+    },
     id::{AssetId, DeviceId, EndpointId},
 };
 
@@ -32,9 +36,28 @@ pub enum Event {
 
 #[derive(Debug, Clone, Serialize, Deserialize, derive_more::From)]
 pub enum DeviceEvent {
-    InitStatusChange { status: DeviceInitStatus },
-    AttrChange { event: AttrChangeEvent },
-    Event { event: ActionEvent },
+    Connecting {
+        timestamp: Timestamp,
+        stage: DeviceConnectionStage,
+    },
+    Connected {
+        device: Device,
+    },
+    SubscriptionStatus {
+        status: DeviceSubscriptionStatus,
+    },
+    AttrChange {
+        event: AttrChangeEvent,
+    },
+    Event {
+        event: ActionEvent,
+    },
+}
+
+impl DeviceEvent {
+    pub fn connecting(stage: DeviceConnectionStage) -> Self {
+        Self::Connecting { timestamp: Timestamp::now(), stage }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

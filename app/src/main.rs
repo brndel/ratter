@@ -1,19 +1,23 @@
 mod attr_dump;
+mod cluster_display;
 mod component;
 mod light_control;
 mod page;
 mod server_state;
 
-use jiff::{Zoned, tz::{Offset, TimeZone}};
+use jiff::{Zoned, tz::TimeZone};
 use page::*;
 use shared_core::{
     asset::{device::DeviceAsset, label::Label, room::Room},
     device::{
         clusters::IdentifyAction,
         device_controls::{
-            ElectricalSensorParams, ElectricalSensorParamsClusters, OccupancySensorParams,
-            OccupancySensorParamsClusters, PowerSourceParams, PowerSourceParamsClusters,
+            ElectricalSensorParams, ElectricalSensorParamsClusters, HumiditySensorParams,
+            HumiditySensorParamsClusters, OccupancySensorParams, OccupancySensorParamsClusters,
+            PowerSourceParams, PowerSourceParamsClusters, SwitchParams, SwitchParamsClusters,
+            TemperatureSensorParams, TemperatureSensorParamsClusters,
         },
+        device_registry::{DeviceConnectionStage, DeviceSubscriptionStatus},
     },
 };
 
@@ -36,11 +40,19 @@ use shared_core::{
 };
 
 use crate::{
-    attr_dump::AttrDumpView, component::{
+    attr_dump::AttrDumpView,
+    cluster_display::{
+        electrical_sensor::display_electrical_sensor, humidity_sensor::display_humidity_sensor,
+        occupancy_sensor::display_occupancy_sensor, power_source::display_power_source,
+        switch::display_switch, temperature_sensor::display_temperature_sensor,
+    },
+    component::{
         color_label::{ColorLabel, ColorLabelStyle},
         dialog_button::{DialogButton, DialogContent, DialogRoot},
         popover_button::{PopoverButton, PopoverContent, PopoverRoot},
-    }, light_control::LightControlView, server_state::ServerState,
+    },
+    light_control::LightControlView,
+    server_state::ServerState,
 };
 
 #[derive(Debug, Clone, Routable, PartialEq)]
@@ -62,6 +74,7 @@ enum Route {
 const FAVICON: Asset = asset!("/assets/favicon.ico");
 const FAVICON_SVG: Asset = asset!("/assets/favicon.svg");
 const MAIN_CSS: Asset = asset!("/assets/main.css");
+const DEVICE_CSS: Asset = asset!("/assets/device.css");
 // const HEADER_SVG: Asset = asset!("/assets/header.svg");
 
 #[cfg(feature = "server")]
@@ -97,6 +110,7 @@ fn App() -> Element {
         document::Link { rel: "icon", href: FAVICON, sizes: "any" }
         document::Link { rel: "icon", href: FAVICON_SVG, r#type: "image/svg+xml" }
         document::Link { rel: "stylesheet", href: MAIN_CSS }
+        document::Link { rel: "stylesheet", href: DEVICE_CSS }
         Router::<Route> {}
     }
 }
@@ -191,27 +205,75 @@ fn DeviceList() -> Element {
 fn DeviceListEntry(device_id: u64, device: Store<DeviceInitStatus>) -> Element {
     let assets = use_context::<ServerState>().asset_registry;
 
-    let (status_text, content): (Result<&'static str, Element>, Option<Element>) =
-        match device.transpose() {
-            DeviceInitStatusStoreTransposed::Waiting => (Ok("waiting…"), None),
-            DeviceInitStatusStoreTransposed::Connecting => (Ok("connecting…"), None),
-            DeviceInitStatusStoreTransposed::Initializing => (Ok("initializing…"), None),
-            DeviceInitStatusStoreTransposed::StartingListeners => (Ok("starting listeners…"), None),
-            DeviceInitStatusStoreTransposed::Disconnected => (Ok("disconnected…"), None),
-            DeviceInitStatusStoreTransposed::Error(err, timestamp) => (
-                Ok("ERROR"),
-                Some(rsx! {
-                    div { {Zoned::new(*timestamp.read(), TimeZone::system()).to_string()} }
-                    PopoverRoot {
-                        PopoverButton { "View Error" }
-                        PopoverContent {
-                            pre { "{err}" }
-                        }
-                    }
-                }),
-            ),
-            DeviceInitStatusStoreTransposed::Connected(device) => (
-                Err(rsx! {
+    let mut connection_status_details = None;
+    let connection_status = match &*(device.read()) {
+        DeviceInitStatus::Connecting { timestamp, stage } => Some({
+            let status = match stage {
+                DeviceConnectionStage::Queued => "queued".to_owned(),
+                DeviceConnectionStage::StartingListeners => "start listeners".to_owned(),
+                DeviceConnectionStage::FetchingDeviceInfo => "fetch device info".to_owned(),
+                DeviceConnectionStage::Error(err) => {
+                    connection_status_details = Some(err.to_string());
+                    format!("Connection error")
+                }
+            };
+
+            connection_status_details = Some(format!(
+                "Connecting...\n last update: {} at {}\n{}",
+                status,
+                Zoned::new(*timestamp, TimeZone::system()).strftime("%H:%M:%S"),
+                connection_status_details.unwrap_or_default()
+            ));
+
+            status
+        }),
+        DeviceInitStatus::Connected {
+            device: _,
+            subscription_status,
+        } => match subscription_status {
+            Some(DeviceSubscriptionStatus::Established { subscription_id }) => {
+                connection_status_details =
+                    Some(format!("connected with subsription_id {}", subscription_id));
+                None
+            }
+            Some(DeviceSubscriptionStatus::Resubscribing { cause }) => {
+                connection_status_details = Some(format!("resubscribing because of: {}", cause));
+                Some("resubscribing".to_string())
+            }
+            Some(DeviceSubscriptionStatus::Lagged { dropped_events }) => {
+                Some(format!("lagged (dropped {})", dropped_events))
+            }
+            Some(DeviceSubscriptionStatus::Closed) => Some("closed".to_string()),
+            None => None,
+        },
+    };
+
+    let connection_class = match &*(device.read()) {
+        DeviceInitStatus::Connecting {
+            timestamp: _,
+            stage,
+        } => match stage {
+            DeviceConnectionStage::Queued { .. } => "waiting",
+            DeviceConnectionStage::StartingListeners => "connecting",
+            DeviceConnectionStage::FetchingDeviceInfo => "connecting",
+            DeviceConnectionStage::Error(_) => "error",
+        },
+        DeviceInitStatus::Connected {
+            device: _,
+            subscription_status,
+        } => match subscription_status {
+            Some(DeviceSubscriptionStatus::Established { .. }) => "connected",
+            Some(DeviceSubscriptionStatus::Resubscribing { .. }) => "connecting",
+            Some(DeviceSubscriptionStatus::Lagged { .. }) => "connected",
+            Some(DeviceSubscriptionStatus::Closed) => "error",
+            None => "waiting",
+        },
+    };
+
+    let cluster_content = match device.transpose() {
+        DeviceInitStatusStoreTransposed::Connected { device, .. } => Some((
+            rsx! {
+                div { class: "h-list",
                     for (endpoint_id , endpoint) in device.endpoints().iter() {
                         for device in endpoint.device_types().iter() {
                             DeviceTypeView {
@@ -223,12 +285,14 @@ fn DeviceListEntry(device_id: u64, device: Store<DeviceInitStatus>) -> Element {
                             }
                         }
                     }
-                }),
-                Some(rsx! {
-                    DeviceListEntryEndpoints { device_id, device }
-                }),
-            ),
-        };
+                }
+            },
+            rsx! {
+                DeviceListEntryEndpoints { device_id, device }
+            },
+        )),
+        _ => None,
+    };
 
     let get_device = move |label_id| assets.read().get_asset::<DeviceAsset>(label_id).cloned();
     let get_room = move |label_id| assets.read().get_asset::<Room>(label_id).cloned();
@@ -268,59 +332,91 @@ fn DeviceListEntry(device_id: u64, device: Store<DeviceInitStatus>) -> Element {
 
     let mut commission_code = use_signal(String::new);
 
+    let (quick_options, details, status) = match cluster_content {
+        Some((quick_options, details)) => (
+            quick_options,
+            rsx! {
+                if let Some(connection_status) = &connection_status {
+                    div { "{connection_status}" }
+                }
+                if let Some(connection_status_details) = connection_status_details {
+                    div { {connection_status_details} }
+                }
+                div { {details} }
+            },
+            connection_status.as_ref().map(|status| rsx! { "{status}" }),
+        ),
+        None => (
+            rsx! {
+                if let Some(connection_status) = &connection_status {
+                    "{connection_status}"
+                } else {
+                    "Connecting…?"
+                }
+            },
+            rsx! {
+                if let Some(connection_status) = &connection_status {
+                    div { "{connection_status}" }
+                }
+                if let Some(connection_status_details) = connection_status_details {
+                    div { {connection_status_details} }
+                }
+            },
+            None,
+        ),
+    };
+
     rsx! {
-        div { class: "device-list-entry", key: "{device_id}",
-            DialogRoot {
-                DialogButton { {header.clone()} }
-                DialogContent {
-                    {header}
+        div {
+            class: "device-list-entry device-card {connection_class}",
+            key: "{device_id}",
+            div { class: "h-list",
+                DialogRoot {
+                    DialogButton { {header.clone()} }
+                    DialogContent { title: "",
+                        {header}
 
-                    "Device id {device_id}"
+                        "Device id {device_id}"
 
-                    {content}
+                        {details}
 
-                    button {
-                        onclick: move |_| async move {
-                            let _ = reconnect_device(device_id).await;
-                        },
-                        "Reconnect"
-                    }
+                        button {
+                            onclick: move |_| async move {
+                                let _ = reconnect_device(device_id).await;
+                            },
+                            "Reconnect"
+                        }
 
-                    button {
-                        onclick: move |_| async move {
-                            commission_code.set("…".to_string());
-                            match open_window(device_id).await {
-                                Ok(code) => {
-                                    commission_code.set(code);
-                                }
-                                Err(err) => {
-                                    commission_code.set(format!("Error: {err}"));
-                                }
-                            };
-                        },
-                        "open recommission window"
-                    }
-                    if !commission_code().is_empty() {
-                        "{commission_code}"
-                    }
+                        button {
+                            onclick: move |_| async move {
+                                commission_code.set("…".to_string());
+                                match open_window(device_id).await {
+                                    Ok(code) => {
+                                        commission_code.set(code);
+                                    }
+                                    Err(err) => {
+                                        commission_code.set(format!("Error: {err}"));
+                                    }
+                                };
+                            },
+                            "open recommission window"
+                        }
+                        if !commission_code().is_empty() {
+                            "{commission_code}"
+                        }
 
-                    DialogRoot {
-                        DialogButton { "dump attrs" }
-                        DialogContent {
-                            AttrDumpView { device: device_id, include_root: true }
+                        DialogRoot {
+                            DialogButton { "dump attrs" }
+                            DialogContent { title: "Dump of Device {device_id}",
+                                AttrDumpView { device: device_id, include_root: true }
+                            }
                         }
                     }
                 }
+                {status}
             }
 
-            match status_text {
-                Ok(text) => rsx! {
-                    div { class: "device-list-entry-status-text", "{text}" }
-                },
-                Err(view) => rsx! {
-                    div { class: "device-list-entry-quickoptions", {view} }
-                },
-            }
+            {quick_options}
         
         }
     }
@@ -396,26 +492,44 @@ fn DeviceTypeView(
 ) -> Element {
     let occupancy_sensor = move || {
         let clusters = clusters.read();
-        let clusters: &Clusters = &clusters;
-        let clusters = OccupancySensorParamsClusters::try_from(clusters).ok();
+        let clusters = OccupancySensorParamsClusters::try_from(&*clusters).ok();
 
         clusters.map(OccupancySensorParams::from)
     };
 
     let electrical_sensor = move || {
         let clusters = clusters.read();
-        let clusters: &Clusters = &clusters;
-        let clusters = ElectricalSensorParamsClusters::try_from(clusters).ok();
+        let clusters = ElectricalSensorParamsClusters::try_from(&*clusters).ok();
 
         clusters.map(ElectricalSensorParams::from)
     };
 
     let power_source = move || {
         let clusters = clusters.read();
-        let clusters: &Clusters = &clusters;
-        let clusters = PowerSourceParamsClusters::try_from(clusters).ok();
+        let clusters = PowerSourceParamsClusters::try_from(&*clusters).ok();
 
         clusters.map(PowerSourceParams::from)
+    };
+
+    let switch = move || {
+        let clusters = clusters.read();
+        let clusters = SwitchParamsClusters::try_from(&*clusters).ok();
+
+        clusters.map(SwitchParams::from)
+    };
+
+    let temperature_sensor = move || {
+        let clusters = clusters.read();
+        let clusters = TemperatureSensorParamsClusters::try_from(&*clusters).ok();
+
+        clusters.map(TemperatureSensorParams::from)
+    };
+
+    let humidity_sensor = move || {
+        let clusters = clusters.read();
+        let clusters = HumiditySensorParamsClusters::try_from(&*clusters).ok();
+
+        clusters.map(HumiditySensorParams::from)
     };
 
     let result_view = move || match device_type {
@@ -450,18 +564,39 @@ fn DeviceTypeView(
             }
         }
         0x0107 if let Some(params) = occupancy_sensor() => {
+            let display = display_occupancy_sensor(params);
             rsx! {
-                pre { "{params:#?}" }
+                {display}
             }
         }
         0x0510 if let Some(params) = electrical_sensor() => {
+            let display = display_electrical_sensor(params);
             rsx! {
-                pre { "{params:#?}" }
+                {display}
             }
         }
         0x0011 if let Some(params) = power_source() => {
+            let display = display_power_source(params);
             rsx! {
-                pre { "{params:#?}" }
+                {display}
+            }
+        }
+        0x000F if let Some(params) = switch() => {
+            let display = display_switch(params);
+            rsx! {
+                {display}
+            }
+        }
+        0x0302 if let Some(params) = temperature_sensor() => {
+            let display = display_temperature_sensor(params);
+            rsx! {
+                {display}
+            }
+        }
+        0x0307 if let Some(params) = humidity_sensor() => {
+            let display = display_humidity_sensor(params);
+            rsx! {
+                {display}
             }
         }
         _ => rsx! {},
@@ -478,7 +613,6 @@ async fn reconnect_device(device_id: u64) -> Result<(), ServerFnError> {
 
     Ok(())
 }
-
 
 #[post("/api/open_window", matter: MatterManagerExt)]
 async fn open_window(device_id: u64) -> Result<String, ServerFnError> {
@@ -499,8 +633,6 @@ async fn run_action(
 
     Ok(())
 }
-
-
 
 #[post("/api/light", matter: MatterManagerExt)]
 async fn control_light(

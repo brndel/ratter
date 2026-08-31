@@ -11,6 +11,9 @@ pub enum AttrChange {
     Identify(IdentifyChange),
     ElectricalPowerMeasurement(ElectricalPowerMeasurementChange),
     ElectricalEnergyMeasurement(ElectricalEnergyMeasurementChange),
+    Switch(SwitchChange),
+    TemperatureMeasurement(TemperatureMeasurementChange),
+    RelativeHumidityMeasurement(RelativeHumidityMeasurementChange),
 }
 
 #[cfg(feature = "backend")]
@@ -50,6 +53,15 @@ use super::*;
                 }
                 <ElectricalEnergyMeasurementChange as ChangeEvent>::State::CLUSTER_ID => {
                     ElectricalEnergyMeasurementChange::from_attr_change(attr, value)?.into()
+                }
+                <SwitchChange as ChangeEvent>::State::CLUSTER_ID => {
+                    SwitchChange::from_attr_change(attr, value)?.into()
+                }
+                <TemperatureMeasurementChange as ChangeEvent>::State::CLUSTER_ID => {
+                    TemperatureMeasurementChange::from_attr_change(attr, value)?.into()
+                }
+                <RelativeHumidityMeasurementChange as ChangeEvent>::State::CLUSTER_ID => {
+                    RelativeHumidityMeasurementChange::from_attr_change(attr, value)?.into()
                 }
                 _ => return Err(anyhow::anyhow!("unkown cluster")),
             };

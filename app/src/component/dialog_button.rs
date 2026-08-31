@@ -36,7 +36,7 @@ pub fn DialogButton(children: Element, #[props(default)] hide_button: bool) -> E
 }
 
 #[component]
-pub fn DialogContent(children: Element) -> Element {
+pub fn DialogContent(title: String, children: Element) -> Element {
     let ctx = try_use_context::<DialogCtx>();
 
     let mut is_open = use_signal(|| false);
@@ -62,6 +62,10 @@ pub fn DialogContent(children: Element) -> Element {
                 class: "dialog-content",
                 "closedby": "any",
                 ontoggle,
+                h2 {
+                    {title}
+                    button { "command": "close", "commandfor": "dialog-{ctx.id}", "X" }
+                }
                 if is_open() {
                     {children}
                 }
