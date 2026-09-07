@@ -111,7 +111,6 @@ impl NodeConnection {
             let tx = tx.clone();
             async move {
                 loop {
-                    info!("awaiting event on node {}", node_id);
                     let Some(Some(event)) = token.run_until_cancelled(sub.next()).await else {
                         break;
                     };

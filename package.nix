@@ -16,9 +16,9 @@ in
   };
   cargoLock = {
     lockFile = ./Cargo.lock;
-    outputHashes = {
-      "matter-bdx-0.3.1" = "sha256-qR3ok9dMxt074+67mPcha1Ss1KirFeFFMxWdz5KiqqA=";
-    };
+    # outputHashes = {
+    #   "matter-bdx-0.3.1" = "sha256-qR3ok9dMxt074+67mPcha1Ss1KirFeFFMxWdz5KiqqA=";
+    # };
   };
 
   nativeBuildInputs =
