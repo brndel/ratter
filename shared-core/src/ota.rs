@@ -1,6 +1,7 @@
-use std::{collections::HashMap, ops::RangeInclusive};
+use std::{collections::HashMap, fmt::Display, ops::RangeInclusive, str::FromStr};
 
 use serde::{Deserialize, Serialize};
+use serde_with::{DisplayFromStr, serde_as};
 
 use crate::id::{ProductId, VendorId};
 
@@ -16,8 +17,10 @@ pub enum OtaManagerClientEvent {
     },
 }
 
+#[serde_as]
 #[derive(Default, Serialize, Deserialize)]
 pub struct OtaManagerClient {
+    #[serde_as(as = "HashMap<DisplayFromStr, _>")]
     versions: HashMap<OtaProductId, Result<Vec<OtaVersion>, String>>,
 }
 
@@ -25,6 +28,37 @@ pub struct OtaManagerClient {
 pub struct OtaProductId {
     pub vendor_id: VendorId,
     pub product_id: ProductId,
+}
+
+impl Display for OtaProductId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}", self.vendor_id, self.product_id)
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum OtaProductIdParseErr {
+    #[error("Missing ':' in OtaProductId")]
+    ColorMissing,
+    #[error("Could not parse vendor_id {0}")]
+    Vendor(<VendorId as FromStr>::Err),
+    #[error("Could not parse product_id {0}")]
+    Product(<ProductId as FromStr>::Err),
+}
+
+impl FromStr for OtaProductId {
+    type Err = OtaProductIdParseErr;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut parts = s.split(':').into_iter();
+        let vid = parts.next().ok_or(OtaProductIdParseErr::ColorMissing)?;
+        let pid = parts.next().ok_or(OtaProductIdParseErr::ColorMissing)?;
+
+        Ok(Self {
+            vendor_id: vid.parse().map_err(OtaProductIdParseErr::Vendor)?,
+            product_id: pid.parse().map_err(OtaProductIdParseErr::Product)?,
+        })
+    }
 }
 
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]

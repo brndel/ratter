@@ -1,4 +1,4 @@
-use dioxus::prelude::*;
+use dioxus::{fullstack::JsonEncoding, prelude::*};
 use shared_core::{
     device::{clusters::BasicInformation, device_controls::OtaRequestor},
     id::DeviceId,
