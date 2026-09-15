@@ -1,3 +1,4 @@
+mod basic_information;
 mod color_control;
 mod define_cluster_macro;
 mod electrical_energy_measurement;
@@ -8,13 +9,13 @@ mod macro_read_invoke;
 mod names;
 mod occupancy_sensing;
 mod on_off;
+mod ota_software_update_requestor;
 mod power_source;
 mod relative_humidity_measurement;
 mod switch;
 mod temperature_measurement;
 
-use std::ops::Deref;
-
+pub use basic_information::*;
 pub use color_control::*;
 use dioxus_stores::Store;
 pub use electrical_energy_measurement::*;
@@ -26,17 +27,17 @@ pub use macro_read_invoke::{invoke, read_decode};
 pub use names::get_cluster_name;
 pub use occupancy_sensing::*;
 pub use on_off::*;
+pub use ota_software_update_requestor::*;
 pub use power_source::*;
 pub use relative_humidity_measurement::*;
-use serde::{Deserialize, Serialize};
 pub use switch::*;
 pub use temperature_measurement::*;
 
 use crate::{
     device::attr_change::AttrChange,
-    event::AttrChangeSource,
     id::{AttrId, ClusterId},
 };
+use serde::{Deserialize, Serialize};
 
 #[derive(
     Debug, Clone, Default, Serialize, Deserialize, Store, derive_more::AsRef, derive_more::AsMut,
@@ -53,6 +54,7 @@ pub struct Clusters {
     pub switch: Option<Switch>,
     pub temperature_measurement: Option<TemperatureMeasurement>,
     pub relative_humidity_measurement: Option<RelativeHumidityMeasurement>,
+    pub ota_software_update_requestor: Option<OtaSoftwareUpdateRequestor>,
     pub cluster_ids: Vec<ClustersClusterId>,
 }
 
@@ -62,106 +64,58 @@ pub struct ClustersClusterId {
     pub listen_attrs: Option<Vec<AttrId>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DeviceValue<T> {
-    device_value: T,
-    user_value: Option<T>,
-}
-
-impl<T: Copy> Copy for DeviceValue<T> {}
-
-impl<T> DeviceValue<T> {
-    pub fn new(device_value: T) -> Self {
-        Self {
-            device_value,
-            user_value: None,
-        }
-    }
-
-    pub fn set_user(&mut self, value: T) {
-        self.user_value = Some(value)
-    }
-
-    pub fn set_device(&mut self, value: T) {
-        self.device_value = value;
-        self.user_value = None
-    }
-}
-
-impl<T> Deref for DeviceValue<T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        match &self.user_value {
-            Some(v) => v,
-            None => &self.device_value,
-        }
-    }
-}
-
 pub trait ChangeEvent {
     type State;
 
-    fn apply(self, state: &mut Self::State, source: AttrChangeSource);
+    fn apply(self, state: &mut Self::State) -> bool;
 }
 
 impl Clusters {
-    pub fn handle_change(&mut self, change: AttrChange, source: AttrChangeSource) {
+    pub fn handle_change(&mut self, change: AttrChange) -> bool {
         match change {
-            AttrChange::OnOff(change) => {
-                if let Some(state) = self.as_mut() {
-                    change.apply(state, source)
-                }
-            }
-            AttrChange::LevelControl(change) => {
-                if let Some(state) = self.as_mut() {
-                    change.apply(state, source)
-                }
-            }
-            AttrChange::ColorControl(change) => {
-                if let Some(state) = self.as_mut() {
-                    change.apply(state, source)
-                }
-            }
-            AttrChange::OccupancySensing(change) => {
-                if let Some(state) = self.as_mut() {
-                    change.apply(state, source)
-                }
-            }
-            AttrChange::Identify(change) => {
-                if let Some(state) = self.as_mut() {
-                    change.apply(state, source)
-                }
-            }
+            AttrChange::OnOff(change) => <Self as AsMut<Option<_>>>::as_mut(self)
+                .as_mut()
+                .is_some_and(|state| change.apply(state)),
+            AttrChange::LevelControl(change) => <Self as AsMut<Option<_>>>::as_mut(self)
+                .as_mut()
+                .is_some_and(|state| change.apply(state)),
+            AttrChange::ColorControl(change) => <Self as AsMut<Option<_>>>::as_mut(self)
+                .as_mut()
+                .is_some_and(|state| change.apply(state)),
+            AttrChange::OccupancySensing(change) => <Self as AsMut<Option<_>>>::as_mut(self)
+                .as_mut()
+                .is_some_and(|state| change.apply(state)),
+            AttrChange::Identify(change) => <Self as AsMut<Option<_>>>::as_mut(self)
+                .as_mut()
+                .is_some_and(|state| change.apply(state)),
             AttrChange::ElectricalPowerMeasurement(change) => {
-                if let Some(state) = self.as_mut() {
-                    change.apply(state, source)
-                }
+                <Self as AsMut<Option<_>>>::as_mut(self)
+                    .as_mut()
+                    .is_some_and(|state| change.apply(state))
             }
             AttrChange::ElectricalEnergyMeasurement(change) => {
-                if let Some(state) = self.as_mut() {
-                    change.apply(state, source)
-                }
+                <Self as AsMut<Option<_>>>::as_mut(self)
+                    .as_mut()
+                    .is_some_and(|state| change.apply(state))
             }
-            AttrChange::PowerSource(change) => {
-                if let Some(state) = self.as_mut() {
-                    change.apply(state, source)
-                }
-            }
-            AttrChange::Switch(change) => {
-                if let Some(state) = self.as_mut() {
-                    change.apply(state, source)
-                }
-            }
-            AttrChange::TemperatureMeasurement(change) => {
-                if let Some(state) = self.as_mut() {
-                    change.apply(state, source)
-                }
-            }
+            AttrChange::PowerSource(change) => <Self as AsMut<Option<_>>>::as_mut(self)
+                .as_mut()
+                .is_some_and(|state| change.apply(state)),
+            AttrChange::Switch(change) => <Self as AsMut<Option<_>>>::as_mut(self)
+                .as_mut()
+                .is_some_and(|state| change.apply(state)),
+            AttrChange::TemperatureMeasurement(change) => <Self as AsMut<Option<_>>>::as_mut(self)
+                .as_mut()
+                .is_some_and(|state| change.apply(state)),
             AttrChange::RelativeHumidityMeasurement(change) => {
-                if let Some(state) = self.as_mut() {
-                    change.apply(state, source)
-                }
+                <Self as AsMut<Option<_>>>::as_mut(self)
+                    .as_mut()
+                    .is_some_and(|state| change.apply(state))
+            }
+            AttrChange::OtaSoftwareUpdateRequestor(change) => {
+                <Self as AsMut<Option<_>>>::as_mut(self)
+                    .as_mut()
+                    .is_some_and(|state| change.apply(state))
             }
         }
     }
@@ -251,6 +205,13 @@ mod impl_from_endpoint {
 
                         listen_attrs = Some(RelativeHumidityMeasurement::LISTEN_ATTRS)
                     }
+                    OtaSoftwareUpdateRequestor::CLUSTER_ID => {
+                        result.ota_software_update_requestor =
+                            Some(OtaSoftwareUpdateRequestor::from_endpoint(node, endpoint).await?);
+
+                        listen_attrs = Some(OtaSoftwareUpdateRequestor::LISTEN_ATTRS)
+                    }
+
                     _ => {}
                 }
 

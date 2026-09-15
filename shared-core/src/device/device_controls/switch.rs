@@ -25,9 +25,9 @@ impl<'a> TryFrom<&'a Clusters> for SwitchParamsClusters<'a> {
 impl<'a> From<SwitchParamsClusters<'a>> for SwitchParams {
     fn from(value: SwitchParamsClusters<'a>) -> Self {
         Self {
-            current_position: *value.switch.current_position,
-            number_of_positions: *value.switch.number_of_positions,
-            multi_press_max: *value.switch.multi_press_max,
+            current_position: value.switch.current_position,
+            number_of_positions: value.switch.number_of_positions,
+            multi_press_max: value.switch.multi_press_max,
         }
     }
 }

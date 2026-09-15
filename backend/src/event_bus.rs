@@ -1,10 +1,10 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, marker::PhantomData, sync::Arc};
 
 use dioxus::logger::tracing::error;
 use shared_core::{
     asset::{asset_registry::AssetRegistry, automation::AutomationState},
     device::device_registry::DeviceRegistry,
-    event::{ActionEvent, AssetEvent, AttrChangeEvent, DeviceEvent, Event},
+    event::{ActionEvent, AssetEvent, AttrChangeEvent, DeviceEvent, DeviceStatusEvent, Event},
     id::AssetId,
 };
 use tokio::sync::{RwLock, broadcast};
@@ -25,6 +25,13 @@ impl EventBus {
     pub fn sender(&self) -> EventBusSender {
         EventBusSender {
             sender: self.broadcast.clone(),
+        }
+    }
+
+    pub fn client_sender<T: Into<Event>>(&self) -> ClientBusSender<T> {
+        ClientBusSender {
+            sender: self.broadcast.clone(),
+            phantom: PhantomData,
         }
     }
 
@@ -67,6 +74,38 @@ impl EventBusSender {
     }
 }
 
+pub struct ClientBusSender<T> {
+    sender: broadcast::Sender<Arc<Event>>,
+    phantom: PhantomData<T>,
+}
+impl<T> Clone for ClientBusSender<T> {
+    fn clone(&self) -> Self {
+        Self {
+            sender: self.sender.clone(),
+            phantom: self.phantom.clone(),
+        }
+    }
+}
+
+impl<T> ClientBusSender<T> {
+    pub fn send(&self, event: T)
+    where
+        T: Into<Event>,
+    {
+        let _ = self.sender.send(Arc::new(event.into()));
+    }
+
+    /// Sends the event created by `event()` if there are any listeners to the client broadcast
+    pub fn send_if(&self, event: impl FnOnce() -> T)
+    where
+        T: Into<Event>,
+    {
+        if self.sender.receiver_count() > 0 {
+            let _ = self.sender.send(Arc::new(event().into()));
+        }
+    }
+}
+
 pub struct EventBusListener {
     receiver: broadcast::Receiver<Arc<Event>>,
 }
@@ -92,8 +131,11 @@ impl EventBusListener {
                             let mut registry = device_registry.write().await;
                             registry.handle_event(*device, event.clone());
 
-                            if let DeviceEvent::Connected {
-                                device: device_data
+                            if let DeviceEvent::Status {
+                                event:
+                                    DeviceStatusEvent::Connected {
+                                        device: device_data,
+                                    },
                             } = &event
                             {
                                 let mut assets = asset_registry.write().await;
@@ -116,6 +158,7 @@ impl EventBusListener {
                             asset_registry.handle_event(*asset, event.clone());
                         }
                         Event::SceneStack { .. } => (),
+                        Event::Ota(_) => (),
                     }
 
                     let assets = asset_registry.read().await;

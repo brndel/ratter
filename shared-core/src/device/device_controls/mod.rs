@@ -7,6 +7,7 @@ mod root_node;
 mod switch;
 mod temperature_sensor;
 mod humidity_sensor;
+mod ota_requestor;
 
 pub use controls::*;
 pub use electrical_sensor::*;
@@ -17,3 +18,4 @@ pub use root_node::*;
 pub use switch::*;
 pub use temperature_sensor::*;
 pub use humidity_sensor::*;
+pub use ota_requestor::*;

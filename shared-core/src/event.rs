@@ -10,15 +10,13 @@ use crate::{
         room::Room,
         scene::Scene,
         scene_layer::SceneLayer,
-    },
-    device::{
+    }, device::{
         AttrChange, ClusterEvent, Device,
         device_registry::{DeviceConnectionStage, DeviceSubscriptionStatus},
-    },
-    id::{AssetId, DeviceId, EndpointId},
+    }, id::{AssetId, DeviceId, EndpointId}, ota::OtaManagerClientEvent,
 };
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, derive_more::From)]
 pub enum Event {
     Device {
         device: DeviceId,
@@ -32,10 +30,11 @@ pub enum Event {
         layer: AssetId,
         active_scenes: Vec<SceneTarget>,
     },
+    Ota(OtaManagerClientEvent)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, derive_more::From)]
-pub enum DeviceEvent {
+pub enum DeviceStatusEvent {
     Connecting {
         timestamp: Timestamp,
         stage: DeviceConnectionStage,
@@ -46,17 +45,23 @@ pub enum DeviceEvent {
     SubscriptionStatus {
         status: DeviceSubscriptionStatus,
     },
-    AttrChange {
-        event: AttrChangeEvent,
-    },
-    Event {
-        event: ActionEvent,
-    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, derive_more::From)]
+pub enum DeviceEvent {
+    Status { event: DeviceStatusEvent },
+    AttrChange { event: AttrChangeEvent },
+    Event { event: ActionEvent },
 }
 
 impl DeviceEvent {
     pub fn connecting(stage: DeviceConnectionStage) -> Self {
-        Self::Connecting { timestamp: Timestamp::now(), stage }
+        Self::Status {
+            event: DeviceStatusEvent::Connecting {
+                timestamp: Timestamp::now(),
+                stage,
+            },
+        }
     }
 }
 

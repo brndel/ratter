@@ -25,10 +25,10 @@ macro_rules! define_cluster {
         $($field_name:ident : $field_ty:ty => $attr_id:ident $($listen:literal)? as $field_enum_variant:ident { $decode_fn:ident $(=> $transform:path)? }),*
     }) => {
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct $struct_name {
     $(
-        pub $field_name: crate::device::clusters::DeviceValue<$field_ty>
+        pub $field_name: $field_ty
     ),*
 }
 
@@ -40,7 +40,7 @@ impl $struct_name {
     ];
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum $enum_name {
     $(
         $field_enum_variant {
@@ -49,18 +49,19 @@ pub enum $enum_name {
     ),*
 }
 
-impl ChangeEvent for $enum_name {
+impl crate::device::clusters::ChangeEvent for $enum_name {
     type State = $struct_name;
 
-    fn apply(self, state: &mut Self::State, source: crate::event::AttrChangeSource) {
+    fn apply(self, state: &mut Self::State) -> bool{
         match self {
             $(
-                Self::$field_enum_variant { $field_name } => match source {
-                    crate::event::AttrChangeSource::Device => {
-                        state.$field_name.device_value = $field_name;
-                        state.$field_name.user_value = None;
-                    },
-                    crate::event::AttrChangeSource::User => state.$field_name.user_value = Some($field_name)
+                Self::$field_enum_variant { $field_name } => {
+                    if state.$field_name != $field_name {
+                        state.$field_name = $field_name;
+                        true
+                    } else {
+                        false
+                    }
                 }
             ),*
         }
@@ -86,7 +87,7 @@ mod backend_impl {
 
             Ok(Self {
                 $(
-                    $field_name: crate::device::clusters::DeviceValue::new(crate::device::clusters::define_cluster_macro::transform_field!($field_name $(=> $transform)?))
+                    $field_name: crate::device::clusters::define_cluster_macro::transform_field!($field_name $(=> $transform)?)
                 ),*
             })
         }

@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, sync::Arc, time::Duration};
+use std::{collections::BTreeMap, net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
 
 use anyhow::{Result, anyhow};
 use dioxus::logger::tracing::info;
@@ -10,7 +10,12 @@ use matter_controller::{
     ThreadDataset,
 };
 use tokio::{
-    fs, sync::{RwLock, mpsc::channel}, time::interval,
+    fs,
+    sync::{
+        RwLock,
+        mpsc::{self, channel},
+    },
+    time::{interval, timeout},
 };
 
 use shared_core::{
@@ -18,13 +23,27 @@ use shared_core::{
         asset_registry::AssetRegistry,
         device::{DeviceAsset, DeviceAssetConfig},
         scene::SceneInRoom,
-    }, attr_dump::AttrDump, backend::RunAction, device::{
-        DeviceCommissionMode, EndpointAction, EndpointTarget, device_controls::LightControl, device_registry::DeviceRegistry,
-    }, id::{AssetId, DeviceId},
+    },
+    attr_dump::AttrDump,
+    backend::RunAction,
+    device::{
+        DeviceCommissionMode, EndpointAction, EndpointTarget, device_controls::LightControl,
+        device_registry::DeviceRegistry,
+    },
+    id::{AssetId, DeviceId},
+    ota::{OtaManagerClient, OtaProductId},
+    thread::{ThreadGraphMessage, ThreadGraphMessageKind},
 };
+use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use crate::{
-    asset::AssetWatcher, controls::Controls, event_bus::{EventBus, EventBusListener}, node_connections::NodeConnections, read_only::ReadOnlyArc,
+    asset::AssetWatcher,
+    controls::Controls,
+    event_bus::{EventBus, EventBusListener},
+    node_connections::NodeConnections,
+    ota::OtaManager,
+    read_only::ReadOnlyArc,
+    thread::{read_otbr_address_map, read_thread_data},
 };
 
 #[derive(Clone)]
@@ -39,7 +58,9 @@ struct MatterManagerInner {
     controls: Arc<RwLock<Controls>>,
     event_bus: EventBus,
     connections: NodeConnections,
+    // db: PersistDb,
     thread_dataset: RwLock<Option<Vec<u8>>>,
+    ota_manager: Arc<RwLock<OtaManager>>,
 }
 
 impl MatterManager {
@@ -73,7 +94,6 @@ impl MatterManager {
         let node = self.0.controller.node(device_id);
 
         self.0.connections.add_node(node, true).await;
-
         Ok(())
     }
 
@@ -116,6 +136,58 @@ impl MatterManager {
             .await
     }
 
+    pub async fn read_thread_graph(
+        &self,
+    ) -> anyhow::Result<impl Stream<Item = ThreadGraphMessage> + use<>> {
+        let address_map = read_otbr_address_map("http://localhost:8081/diagnostics").await?;
+
+        info!("Address map: {address_map:#?}");
+
+        let (tx, rx) = mpsc::unbounded_channel();
+
+        let devices = self.0.device_registry.read().await;
+
+        for node in self.0.controller.nodes().await? {
+            info!("Node {} has ip: {:?}", node.node_id, node.last_known_addr);
+            if devices.is_connected(node.node_id) {
+                let ext_addr = if let Some(ip_addr) = node.last_known_addr
+                    && let Ok(trimmed_ip) = SocketAddr::from_str(&ip_addr)
+                    && let Some(addr) = address_map.get(&trimmed_ip.ip().to_string()).cloned()
+                {
+                    Some(addr)
+                } else {
+                    None
+                };
+
+                let id = node.node_id;
+                let node = self.0.controller.node(id);
+                let tx = tx.clone();
+                tokio::spawn(async move {
+                    let result = read_thread_data(&node, ext_addr).await;
+                    tx.send(ThreadGraphMessage {
+                        device: id,
+                        kind: match result {
+                            Ok(data) => ThreadGraphMessageKind::Discovered(data),
+                            Err(err) => ThreadGraphMessageKind::Error(err.to_string()),
+                        },
+                    })
+                });
+            } else {
+                if tx
+                    .send(ThreadGraphMessage {
+                        device: node.node_id,
+                        kind: ThreadGraphMessageKind::NotReadyYet,
+                    })
+                    .is_err()
+                {
+                    break;
+                }
+            }
+        }
+
+        Ok(UnboundedReceiverStream::new(rx))
+    }
+
     pub async fn set_light_control(
         &self,
         target: EndpointTarget,
@@ -151,6 +223,56 @@ impl MatterManager {
     pub async fn get_active_scenes(&self) -> BTreeMap<AssetId, Vec<SceneInRoom>> {
         let controls = self.0.controls.read().await;
         controls.active_scenes()
+    }
+}
+
+impl MatterManager {
+    pub async fn get_ota_manager(&self) -> OtaManagerClient {
+        self.0.ota_manager.read().await.client()
+    }
+
+    pub async fn load_ota_versions(&self, product: OtaProductId) {
+        self.0
+            .ota_manager
+            .write()
+            .await
+            .fetch_ota_versions(product)
+            .await
+    }
+
+    pub async fn ota_update_device(&self, device: DeviceId, version: u32) -> anyhow::Result<()> {
+        let (vendor_id, product_id) = {
+            let device_registry = self.0.device_registry.read().await;
+            let device = device_registry
+                .get_device(device)
+                .ok_or_else(|| anyhow!("device not ready"))?;
+            (
+                device.basic_information.vendor_id,
+                device.basic_information.product_id,
+            )
+        };
+
+        let image = self
+            .0
+            .ota_manager
+            .write()
+            .await
+            .fetch_ota_image(
+                OtaProductId {
+                    vendor_id,
+                    product_id,
+                },
+                version,
+            )
+            .await?;
+
+        timeout(
+            Duration::from_mins(5),
+            self.0.controller.serve_ota(device, image, version, 9132),
+        )
+        .await??;
+
+        Ok(())
     }
 }
 
@@ -203,19 +325,26 @@ impl MatterManagerInner {
             let controller = device_manager.clone();
 
             async move {
-                
                 loop {
                     reconnect_interval.tick().await;
                     info!("reconnecting all devices in need of reconnecting");
-                    
-                    let nodes = controller.nodes().await.unwrap().into_iter().map(|info| info.node_id);
+
+                    let nodes = controller
+                        .nodes()
+                        .await
+                        .unwrap()
+                        .into_iter()
+                        .map(|info| info.node_id);
                     // let nodes = [9, 40, 43, 2, 3].iter().cloned();
 
                     let total_nodes_count = nodes.len();
 
                     let connected_devices = connections.add_nodes(nodes, &controller, false).await;
 
-                    info!("initiated connection for {} of {} total devices", connected_devices, total_nodes_count);
+                    info!(
+                        "initiated connection for {} of {} total devices",
+                        connected_devices, total_nodes_count
+                    );
                 }
             }
         });
@@ -231,6 +360,11 @@ impl MatterManagerInner {
             RwLock::new(dataset)
         };
 
+        let ota_manager = OtaManager::new(event_bus.client_sender()).await;
+        let ota_manager = Arc::new(RwLock::new(ota_manager));
+
+        // let db = PersistDb::new().await?;
+
         Ok(Self {
             controller: device_manager,
             device_registry,
@@ -239,7 +373,9 @@ impl MatterManagerInner {
             controls: device_controls,
             event_bus,
             connections,
+            // db,
             thread_dataset,
+            ota_manager,
         })
     }
 

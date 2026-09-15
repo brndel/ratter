@@ -1,177 +1,138 @@
+pub use shared::*;
+pub use hue_sat::*;
+pub use temperature::*;
+pub use xy::*;
+
 use serde::{Deserialize, Serialize};
 
 use crate::device::clusters::ChangeEvent;
 
-// define_cluster!(
-// struct ColorControl, enum ColorControlChange, color_control, CLUSTER_ID_COLOR_CONTROL {
-//     current_hue: u8 => CLUSTER_COLOR_CONTROL_ATTR_ID_CURRENTHUE as SetCurrentHue { read_current_hue, decode_current_hue },
-//     current_saturation: u8 => CLUSTER_COLOR_CONTROL_ATTR_ID_CURRENTSATURATION as SetCurrentSaturation { read_current_saturation, decode_current_saturation },
-//     current_x: u16 => CLUSTER_COLOR_CONTROL_ATTR_ID_CURRENTX as SetCurrentX { read_current_x, decode_current_x },
-//     current_y: u16 => CLUSTER_COLOR_CONTROL_ATTR_ID_CURRENTY as SetCurrentY { read_current_y, decode_current_y },
-//     color_temperature_mireds: u16 => CLUSTER_COLOR_CONTROL_ATTR_ID_COLORTEMPERATUREMIREDS as SetColorTemperatureMireds { read_color_temperature_mireds, decode_color_temperature_mireds },
-//     color_temperature_mireds_min: u16 => CLUSTER_COLOR_CONTROL_ATTR_ID_COLORTEMPPHYSICALMINMIREDS as SetColorTemperatureMiredsMin { read_color_temp_physical_min_mireds, decode_color_temp_physical_min_mireds },
-//     color_temperature_mireds_max: u16 => CLUSTER_COLOR_CONTROL_ATTR_ID_COLORTEMPPHYSICALMAXMIREDS as SetColorTemperatureMiredsMax { read_color_temp_physical_max_mireds, decode_color_temp_physical_max_mireds },
-//     color_mode: ColorControlMode => CLUSTER_COLOR_CONTROL_ATTR_ID_COLORMODE as SetColorMode { read_color_mode, decode_color_mode }
-// }
-// );
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ColorControl {
-    pub features: u16,
+    pub shared: ColorControlShared,
     pub hue_saturation: Option<ColorControlFeatureHueSat>,
     pub temperature: Option<ColorControlFeatureTemperature>,
     pub xy: Option<ColorControlFeatureXy>,
-    pub color_mode: crate::device::clusters::DeviceValue<ColorControlMode>,
 }
 
 impl ColorControl {
     pub const LISTEN_ATTRS: &'static [Option<u32>] = const {
         use matter_clusters::r#gen::color_control::attribute_id::*;
-        &[Some(COLOR_MODE), Some(CURRENT_HUE), Some(CURRENT_SATURATION), Some(COLOR_TEMPERATURE_MIREDS), Some(CURRENT_X), Some(CURRENT_Y)]};
+        &[
+            Some(COLOR_MODE),
+            Some(CURRENT_HUE),
+            Some(CURRENT_SATURATION),
+            Some(COLOR_TEMPERATURE_MIREDS),
+            Some(CURRENT_X),
+            Some(CURRENT_Y),
+        ]
+    };
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct ColorControlFeatureHueSat {
-    pub current_hue: crate::device::clusters::DeviceValue<u8>,
-    pub current_saturation: crate::device::clusters::DeviceValue<u8>,
+mod shared {
+    use matter_clusters::r#gen::color_control::ColorCapabilitiesBitmap;
+
+use crate::device::clusters::define_cluster_macro::define_cluster;
+    use super::ColorControlMode;
+
+
+    define_cluster!(
+        struct ColorControlShared, enum ColorControlSharedChange, color_control {
+            features: u16 => COLOR_CAPABILITIES as SetFeatures { decode_color_capabilities => feature_bits },
+            color_mode: ColorControlMode => COLOR_MODE "listen" as SetColorMode { decode_color_mode }
+        }
+    );
+
+    fn feature_bits(bits: ColorCapabilitiesBitmap) -> u16 {
+        bits.bits()
+    }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct ColorControlFeatureTemperature {
-    pub color_temperature_mireds: crate::device::clusters::DeviceValue<u16>,
-    pub color_temperature_mireds_min: crate::device::clusters::DeviceValue<u16>,
-    pub color_temperature_mireds_max: crate::device::clusters::DeviceValue<u16>,
+mod hue_sat {
+    use crate::device::clusters::define_cluster_macro::define_cluster;
+
+    define_cluster!(
+        struct ColorControlFeatureHueSat, enum ColorControlFeatureHueSatChange, color_control {
+            current_hue: u8 => CURRENT_HUE "listen" as SetCurrentHue { decode_current_hue },
+            current_saturation: u8 => CURRENT_SATURATION "listen" as SetCurrentSaturation { decode_current_saturation }
+        }
+    );
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct ColorControlFeatureXy {
-    pub current_x: crate::device::clusters::DeviceValue<u16>,
-    pub current_y: crate::device::clusters::DeviceValue<u16>,
+mod temperature {
+    use crate::device::clusters::define_cluster_macro::define_cluster;
+
+    define_cluster!(
+        struct ColorControlFeatureTemperature, enum ColorControlFeatureTemperatureChange, color_control {
+            color_temperature_mireds: u16 => COLOR_TEMPERATURE_MIREDS "listen" as SetColorTemperatureMireds { decode_color_temperature_mireds },
+            color_temperature_mireds_min: u16 => COLOR_TEMP_PHYSICAL_MIN_MIREDS as SetColorTemperatureMiredsMin { decode_color_temp_physical_min_mireds },
+            color_temperature_mireds_max: u16 => COLOR_TEMP_PHYSICAL_MAX_MIREDS as SetColorTemperatureMiredsMax { decode_color_temp_physical_max_mireds }
+        }
+    );
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+mod xy {
+    use crate::device::clusters::define_cluster_macro::define_cluster;
+
+    define_cluster!(
+        struct ColorControlFeatureXy, enum ColorControlFeatureXyChange, color_control {
+            current_x: u16 => CURRENT_X "listen" as SetCurrentX { decode_current_x },
+            current_y: u16 => CURRENT_Y "listen" as SetCurrentY { decode_current_y }
+        }
+    );
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, derive_more::From)]
 pub enum ColorControlChange {
-    SetCurrentHue { current_hue: u8 },
-    SetCurrentSaturation { current_saturation: u8 },
-    SetCurrentX { current_x: u16 },
-    SetCurrentY { current_y: u16 },
-    SetColorTemperatureMireds { color_temperature_mireds: u16 },
-    SetColorMode { color_mode: ColorControlMode },
+    Shared(ColorControlSharedChange),
+    HueSat(ColorControlFeatureHueSatChange),
+    Temperature(ColorControlFeatureTemperatureChange),
+    Xy(ColorControlFeatureXyChange),
 }
+
 impl ChangeEvent for ColorControlChange {
     type State = ColorControl;
-    fn apply(self, state: &mut Self::State, source: crate::event::AttrChangeSource) {
+    fn apply(self, state: &mut Self::State) -> bool {
         match self {
-            Self::SetCurrentHue { current_hue } => {
-                let Some(value) = state
-                    .hue_saturation
-                    .as_mut()
-                    .map(|value| &mut value.current_hue)
-                else {
-                    return;
-                };
-                match source {
-                    crate::event::AttrChangeSource::Device => {
-                        value.device_value = current_hue;
-                        value.user_value = None;
-                    }
-                    crate::event::AttrChangeSource::User => value.user_value = Some(current_hue),
-                }
+            ColorControlChange::HueSat(change) => state
+                .hue_saturation
+                .as_mut()
+                .is_some_and(|state| change.apply(state)),
+            ColorControlChange::Temperature(change) => state
+                .temperature
+                .as_mut()
+                .is_some_and(|state| change.apply(state)),
+            ColorControlChange::Xy(change) => {
+                state.xy.as_mut().is_some_and(|state| change.apply(state))
             }
-            Self::SetCurrentSaturation { current_saturation } => {
-                let Some(value) = state
-                    .hue_saturation
-                    .as_mut()
-                    .map(|value| &mut value.current_saturation)
-                else {
-                    return;
-                };
-                match source {
-                    crate::event::AttrChangeSource::Device => {
-                        value.device_value = current_saturation;
-                        value.user_value = None;
-                    }
-                    crate::event::AttrChangeSource::User => {
-                        value.user_value = Some(current_saturation)
-                    }
-                }
-            }
-            Self::SetCurrentX { current_x } => {
-                let Some(value) = state.xy.as_mut().map(|value| &mut value.current_x) else {
-                    return;
-                };
-                match source {
-                    crate::event::AttrChangeSource::Device => {
-                        value.device_value = current_x;
-                        value.user_value = None;
-                    }
-                    crate::event::AttrChangeSource::User => value.user_value = Some(current_x),
-                }
-            }
-            Self::SetCurrentY { current_y } => {
-                let Some(value) = state.xy.as_mut().map(|value| &mut value.current_y) else {
-                    return;
-                };
-                match source {
-                    crate::event::AttrChangeSource::Device => {
-                        value.device_value = current_y;
-                        value.user_value = None;
-                    }
-                    crate::event::AttrChangeSource::User => value.user_value = Some(current_y),
-                }
-            }
-            Self::SetColorTemperatureMireds {
-                color_temperature_mireds,
-            } => {
-                let Some(value) = state
-                    .temperature
-                    .as_mut()
-                    .map(|value| &mut value.color_temperature_mireds)
-                else {
-                    return;
-                };
-                match source {
-                    crate::event::AttrChangeSource::Device => {
-                        value.device_value = color_temperature_mireds;
-                        value.user_value = None;
-                    }
-                    crate::event::AttrChangeSource::User => {
-                        value.user_value = Some(color_temperature_mireds)
-                    }
-                }
-            }
-            Self::SetColorMode { color_mode } => match source {
-                crate::event::AttrChangeSource::Device => {
-                    state.color_mode.device_value = color_mode;
-                    state.color_mode.user_value = None;
-                }
-                crate::event::AttrChangeSource::User => {
-                    state.color_mode.user_value = Some(color_mode)
-                }
-            },
+            ColorControlChange::Shared(change) => change.apply(&mut state.shared),
         }
     }
 }
 #[cfg(feature = "backend")]
-mod backend_impl {
-    use matter_clusters::r#gen::color_control::{self, ColorCapabilitiesBitmap};
-    use matter_codec::{TlvWriter, Value};
+mod backend_impl_2 {
+    use matter_clusters::r#gen::color_control::ColorCapabilitiesBitmap;
+    use matter_codec::Value;
     use matter_controller::Node;
 
-    use crate::read_decode;
+    use crate::
+        device::clusters::{
+            ColorControlFeatureHueSatChange,
+            ColorControlFeatureTemperatureChange, ColorControlSharedChange,
+        }
+    ;
 
     impl crate::backend::ClusterState for super::ColorControl {
         const CLUSTER_ID: u32 = matter_clusters::r#gen::color_control::CLUSTER_ID;
     }
     impl crate::backend::FromEndpoint for super::ColorControl {
         async fn from_endpoint(node: &Node, endpoint: u16) -> anyhow::Result<Self> {
-            read_decode!(node, endpoint, [
-                features = { color_control, COLOR_CAPABILITIES, decode_color_capabilities },
-                color_mode = { color_control, COLOR_MODE, decode_color_mode }
-            ]);
+            let shared = super::ColorControlShared::from_endpoint(node, endpoint).await?;
+
+            let features = ColorCapabilitiesBitmap::from_bits_retain(shared.features);
 
             Ok(Self {
-                features: features.bits(),
+                shared,
                 hue_saturation: if features.contains(ColorCapabilitiesBitmap::HUE_SATURATION) {
                     Some(super::ColorControlFeatureHueSat::from_endpoint(node, endpoint).await?)
                 } else {
@@ -190,106 +151,78 @@ mod backend_impl {
                 } else {
                     None
                 },
-                color_mode: crate::device::clusters::DeviceValue::new(color_mode.into()),
             })
         }
     }
 
-    impl crate::backend::FromEndpoint for super::ColorControlFeatureHueSat {
-        async fn from_endpoint(node: &Node, endpoint: u16) -> anyhow::Result<Self> {
-            read_decode!(node, endpoint, [
-                current_hue = {color_control, CURRENT_HUE, decode_current_hue},
-                current_saturation = {color_control, CURRENT_SATURATION, decode_current_saturation}
-            ]);
+    // impl crate::backend::FromEndpoint for super::ColorControlFeatureHueSat {
+    //     async fn from_endpoint(node: &Node, endpoint: u16) -> anyhow::Result<Self> {
+    //         read_decode!(node, endpoint, [
+    //             current_hue = {color_control, CURRENT_HUE, decode_current_hue},
+    //             current_saturation = {color_control, CURRENT_SATURATION, decode_current_saturation}
+    //         ]);
 
-            Ok(Self {
-                current_hue: crate::device::clusters::DeviceValue::new(current_hue),
-                current_saturation: crate::device::clusters::DeviceValue::new(current_saturation),
-            })
-        }
-    }
+    //         Ok(Self {
+    //             current_hue: crate::device::clusters::DeviceValue::new(current_hue),
+    //             current_saturation: crate::device::clusters::DeviceValue::new(current_saturation),
+    //         })
+    //     }
+    // }
 
-    impl crate::backend::FromEndpoint for super::ColorControlFeatureTemperature {
-        async fn from_endpoint(node: &Node, endpoint: u16) -> anyhow::Result<Self> {
-            read_decode!(node, endpoint, [
-                color_temperature_mireds = {color_control, COLOR_TEMPERATURE_MIREDS, decode_color_temperature_mireds},
-                color_temperature_mireds_min = {color_control, COLOR_TEMP_PHYSICAL_MIN_MIREDS, decode_color_temp_physical_min_mireds},
-                color_temperature_mireds_max = {color_control, COLOR_TEMP_PHYSICAL_MAX_MIREDS, decode_color_temp_physical_max_mireds}
-            ]);
+    // impl crate::backend::FromEndpoint for super::ColorControlFeatureTemperature {
+    //     async fn from_endpoint(node: &Node, endpoint: u16) -> anyhow::Result<Self> {
+    //         read_decode!(node, endpoint, [
+    //             color_temperature_mireds = {color_control, COLOR_TEMPERATURE_MIREDS, decode_color_temperature_mireds},
+    //             color_temperature_mireds_min = {color_control, COLOR_TEMP_PHYSICAL_MIN_MIREDS, decode_color_temp_physical_min_mireds},
+    //             color_temperature_mireds_max = {color_control, COLOR_TEMP_PHYSICAL_MAX_MIREDS, decode_color_temp_physical_max_mireds}
+    //         ]);
 
-            Ok(Self {
-                color_temperature_mireds: crate::device::clusters::DeviceValue::new(
-                    color_temperature_mireds,
-                ),
-                color_temperature_mireds_min: crate::device::clusters::DeviceValue::new(
-                    color_temperature_mireds_min,
-                ),
-                color_temperature_mireds_max: crate::device::clusters::DeviceValue::new(
-                    color_temperature_mireds_max,
-                ),
-            })
-        }
-    }
-    impl crate::backend::FromEndpoint for super::ColorControlFeatureXy {
-        async fn from_endpoint(node: &Node, endpoint: u16) -> anyhow::Result<Self> {
-            read_decode!(node, endpoint, [
-                current_x = {color_control, CURRENT_X, decode_current_x},
-                current_y = {color_control, CURRENT_Y, decode_current_y}
-            ]);
+    //         Ok(Self {
+    //             color_temperature_mireds: crate::device::clusters::DeviceValue::new(
+    //                 color_temperature_mireds,
+    //             ),
+    //             color_temperature_mireds_min: crate::device::clusters::DeviceValue::new(
+    //                 color_temperature_mireds_min,
+    //             ),
+    //             color_temperature_mireds_max: crate::device::clusters::DeviceValue::new(
+    //                 color_temperature_mireds_max,
+    //             ),
+    //         })
+    //     }
+    // }
+    // impl crate::backend::FromEndpoint for super::ColorControlFeatureXy {
+    //     async fn from_endpoint(node: &Node, endpoint: u16) -> anyhow::Result<Self> {
+    //         read_decode!(node, endpoint, [
+    //             current_x = {color_control, CURRENT_X, decode_current_x},
+    //             current_y = {color_control, CURRENT_Y, decode_current_y}
+    //         ]);
 
-            Ok(Self {
-                current_x: crate::device::clusters::DeviceValue::new(current_x),
-                current_y: crate::device::clusters::DeviceValue::new(current_y),
-            })
-        }
-    }
+    //         Ok(Self {
+    //             current_x: crate::device::clusters::DeviceValue::new(current_x),
+    //             current_y: crate::device::clusters::DeviceValue::new(current_y),
+    //         })
+    //     }
+    // }
 
     impl crate::backend::FromAttrChange for super::ColorControlChange {
         fn from_attr_change(attr: u32, value: &Value) -> anyhow::Result<Self> {
             let mut tlv_bytes = Vec::new();
-            let mut writer = TlvWriter::new(&mut tlv_bytes);
+            let mut writer = matter_codec::TlvWriter::new(&mut tlv_bytes);
             writer
                 .write_value(matter_codec::Tag::Anonymous, &value)
-                .unwrap();
+                .expect("writing to vec should not fail");
 
-            let value = match attr {
-                matter_clusters::r#gen::color_control::attribute_id::CURRENT_HUE => {
-                    Self::SetCurrentHue {
-                        current_hue: color_control::decode_current_hue(&tlv_bytes)?.into(),
-                    }
-                }
-                matter_clusters::r#gen::color_control::attribute_id::CURRENT_SATURATION => {
-                    Self::SetCurrentSaturation {
-                        current_saturation: color_control::decode_current_saturation(&tlv_bytes)?
-                            .into(),
-                    }
-                }
-                matter_clusters::r#gen::color_control::attribute_id::CURRENT_X => {
-                    Self::SetCurrentX {
-                        current_x: color_control::decode_current_x(&tlv_bytes)?.into(),
-                    }
-                }
-                matter_clusters::r#gen::color_control::attribute_id::CURRENT_Y => {
-                    Self::SetCurrentY {
-                        current_y: color_control::decode_current_y(&tlv_bytes)?.into(),
-                    }
-                }
-                matter_clusters::r#gen::color_control::attribute_id::COLOR_TEMPERATURE_MIREDS => {
-                    Self::SetColorTemperatureMireds {
-                        color_temperature_mireds: color_control::decode_color_temperature_mireds(
-                            &tlv_bytes,
-                        )?
-                        .into(),
-                    }
-                }
-                matter_clusters::r#gen::color_control::attribute_id::COLOR_MODE => {
-                    Self::SetColorMode {
-                        color_mode: color_control::decode_color_mode(&tlv_bytes)?.into(),
-                    }
-                }
-                _ => return Err(anyhow::anyhow!("unkown attr")),
-            };
-            Ok(value)
+            ColorControlFeatureTemperatureChange::from_attr_change(attr, value)
+                .map(Into::into)
+                .or_else(|_| {
+                    ColorControlFeatureHueSatChange::from_attr_change(attr, value).map(Into::into)
+                })
+                .or_else(|_| {
+                    ColorControlFeatureHueSatChange::from_attr_change(attr, value).map(Into::into)
+                })
+                .or_else(|_| {
+                    ColorControlSharedChange::from_attr_change(attr, value).map(Into::into)
+                })
         }
     }
 }
@@ -354,14 +287,19 @@ mod impl_action {
                     .await?;
 
                     Ok(vec![
-                        ColorControlChange::SetColorMode {
+                        ColorControlChange::from(ColorControlSharedChange::SetColorMode {
                             color_mode: ColorControlMode::HueSaturation,
-                        }
+                        })
                         .into(),
-                        ColorControlChange::SetCurrentHue { current_hue: hue }.into(),
-                        ColorControlChange::SetCurrentSaturation {
-                            current_saturation: saturation,
-                        }
+                        ColorControlChange::from(ColorControlFeatureHueSatChange::SetCurrentHue {
+                            current_hue: hue,
+                        })
+                        .into(),
+                        ColorControlChange::from(
+                            ColorControlFeatureHueSatChange::SetCurrentSaturation {
+                                current_saturation: saturation,
+                            },
+                        )
                         .into(),
                     ])
                 }
@@ -382,12 +320,18 @@ mod impl_action {
                     .await?;
 
                     Ok(vec![
-                        ColorControlChange::SetColorMode {
+                        ColorControlChange::from(ColorControlSharedChange::SetColorMode {
                             color_mode: ColorControlMode::Xy,
-                        }
+                        })
                         .into(),
-                        ColorControlChange::SetCurrentX { current_x: x }.into(),
-                        ColorControlChange::SetCurrentY { current_y: y }.into(),
+                        ColorControlChange::from(ColorControlFeatureXyChange::SetCurrentX {
+                            current_x: x,
+                        })
+                        .into(),
+                        ColorControlChange::from(ColorControlFeatureXyChange::SetCurrentY {
+                            current_y: y,
+                        })
+                        .into(),
                     ])
                 }
                 ColorControlAction::SetColorTemperature { temperature } => {
@@ -406,13 +350,15 @@ mod impl_action {
                     .await?;
 
                     Ok(vec![
-                        ColorControlChange::SetColorMode {
+                        ColorControlChange::from(ColorControlSharedChange::SetColorMode {
                             color_mode: ColorControlMode::Temperature,
-                        }
+                        })
                         .into(),
-                        ColorControlChange::SetColorTemperatureMireds {
-                            color_temperature_mireds: temperature,
-                        }
+                        ColorControlChange::from(
+                            ColorControlFeatureTemperatureChange::SetColorTemperatureMireds {
+                                color_temperature_mireds: temperature,
+                            },
+                        )
                         .into(),
                     ])
                 }
@@ -423,11 +369,11 @@ mod impl_action {
 
 impl ColorControl {
     pub fn css_color(&self, level: u8) -> String {
-        match *self.color_mode {
+        match self.shared.color_mode {
             ColorControlMode::HueSaturation => {
                 if let Some(hue_saturation) = &self.hue_saturation {
-                    let hue = *hue_saturation.current_hue as u32 * 360 / 254;
-                    let white = 100 - *hue_saturation.current_saturation as u32 * 100 / 254;
+                    let hue = hue_saturation.current_hue as u32 * 360 / 254;
+                    let white = 100 - hue_saturation.current_saturation as u32 * 100 / 254;
                     let black = 100 - level as u32 * 100 / 254;
 
                     format!("hwb({} {}% {}%)", hue, white, black)
@@ -438,7 +384,7 @@ impl ColorControl {
             ColorControlMode::Temperature => {
                 if let Some(temperature) = &self.temperature {
                     Self::temperature_mireds_to_css_color(
-                        *temperature.color_temperature_mireds,
+                        temperature.color_temperature_mireds,
                         level,
                     )
                 } else {

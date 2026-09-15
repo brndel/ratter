@@ -48,8 +48,8 @@ impl AutomationCondition {
         self.multi_behaviour.on_iter(endpoints, |endpoint| {
             devices
                 .get_cluster(endpoint)
-                .and_then(|clusters| clusters.occupancy_sensing)
-                .is_some_and(|occupancy| *occupancy.is_occupied)
+                .and_then(|clusters| clusters.occupancy_sensing.as_ref())
+                .is_some_and(|occupancy| occupancy.is_occupied)
         })
     }
 }

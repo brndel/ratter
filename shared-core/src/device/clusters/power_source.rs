@@ -1,9 +1,8 @@
-#[cfg(feature = "backend")]
 use matter_clusters::r#gen::power_source::BatCommonDesignationEnum;
 use matter_clusters::types::Nullable;
 use serde::{Deserialize, Serialize};
 
-use crate::device::clusters::{ChangeEvent, define_cluster_macro::define_cluster};
+use crate::device::clusters::define_cluster_macro::define_cluster;
 
 define_cluster!(
 struct PowerSource, enum PowerSourceChange, power_source {
@@ -13,7 +12,7 @@ struct PowerSource, enum PowerSourceChange, power_source {
 }
 );
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum BatteryKind {
     Unspecified,
     AAA,
@@ -21,7 +20,6 @@ pub enum BatteryKind {
     Other,
 }
 
-#[cfg(feature = "backend")]
 impl From<BatCommonDesignationEnum> for BatteryKind {
     fn from(value: BatCommonDesignationEnum) -> Self {
         match value {

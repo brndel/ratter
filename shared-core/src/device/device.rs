@@ -3,12 +3,11 @@ use std::collections::BTreeMap;
 use dioxus_stores::Store;
 use serde::{Deserialize, Serialize};
 
-use crate::device::clusters::Clusters;
+use crate::device::clusters::{BasicInformation, Clusters};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Store)]
 pub struct Device {
-    pub product_name: String,
-    pub vendor_name: String,
+    pub basic_information: BasicInformation,
     pub endpoints: BTreeMap<u16, Endpoint>,
 }
 
@@ -34,15 +33,13 @@ mod impl_from_traits {
 
     impl FromNode for Device {
         async fn from_node(node: &Node) -> anyhow::Result<Self> {
-            let endpoint = 0;
+            let basic_information = BasicInformation::from_endpoint(node, 0).await?;
+
             read_decode!(
-                node, endpoint, [
-                    product_name = {basic_information, PRODUCT_NAME, decode_product_name},
-                    vendor_name = {basic_information, VENDOR_NAME, decode_vendor_name},
+                node, 0, [
                     parts = {descriptor, PARTS_LIST, decode_parts_list}
                 ]
             );
-
             let endpoints = {
                 let endpoint_ids = parts;
 
@@ -58,8 +55,7 @@ mod impl_from_traits {
             };
 
             Ok(Device {
-                product_name,
-                vendor_name,
+                basic_information,
                 endpoints,
             })
         }

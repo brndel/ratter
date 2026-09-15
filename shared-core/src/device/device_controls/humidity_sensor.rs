@@ -25,7 +25,7 @@ impl<'a> TryFrom<&'a Clusters> for HumiditySensorParamsClusters<'a> {
 impl<'a> From<HumiditySensorParamsClusters<'a>> for HumiditySensorParams {
     fn from(value: HumiditySensorParamsClusters<'a>) -> Self {
         Self {
-            humidity: *value.relative_humidity_measurement.measured_value,
+            humidity: value.relative_humidity_measurement.measured_value,
         }
     }
 }

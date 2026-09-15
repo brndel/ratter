@@ -25,7 +25,7 @@ impl<'a> TryFrom<&'a Clusters> for TemperatureSensorParamsClusters<'a> {
 impl<'a> From<TemperatureSensorParamsClusters<'a>> for TemperatureSensorParams {
     fn from(value: TemperatureSensorParamsClusters<'a>) -> Self {
         Self {
-            temperature: *value.temperature_measurement.measured_value,
+            temperature: value.temperature_measurement.measured_value,
         }
     }
 }

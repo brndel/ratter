@@ -43,28 +43,28 @@ impl<'a> TryFrom<&'a Clusters> for LightControlClusters<'a> {
 impl<'a> From<LightControlClusters<'a>> for LightControl {
     fn from(value: LightControlClusters<'_>) -> Self {
         Self {
-            is_on: *value.on_off.is_on,
+            is_on: value.on_off.is_on,
             level: value.level_control.level.unwrap_or_default(),
-            color: match *value.color_control.color_mode {
+            color: match value.color_control.shared.color_mode {
                 ColorControlMode::HueSaturation => LightControlColor::HueSaturation {
                     hue: value
                         .color_control
-                        .hue_saturation
-                        .map_or(0, |hue_saturation| *hue_saturation.current_hue),
+                        .hue_saturation.as_ref()
+                        .map_or(0, |hue_saturation| hue_saturation.current_hue),
                     saturation: value
                         .color_control
-                        .hue_saturation
-                        .map_or(150, |hue_saturation| *hue_saturation.current_saturation),
+                        .hue_saturation.as_ref()
+                        .map_or(150, |hue_saturation| hue_saturation.current_saturation),
                 },
                 ColorControlMode::Xy => LightControlColor::Xy {
-                    x: value.color_control.xy.map_or(0, |xy| *xy.current_x),
-                    y: value.color_control.xy.map_or(0, |xy| *xy.current_y),
+                    x: value.color_control.xy.as_ref().map_or(0, |xy| xy.current_x),
+                    y: value.color_control.xy.as_ref().map_or(0, |xy| xy.current_y),
                 },
                 ColorControlMode::Temperature => LightControlColor::Temperature {
                     temperature: value
                         .color_control
-                        .temperature
-                        .map_or(200, |temperature| *temperature.color_temperature_mireds),
+                        .temperature.as_ref()
+                        .map_or(200, |temperature| temperature.color_temperature_mireds),
                 },
                 ColorControlMode::Unkown => LightControlColor::Unkown,
             },
@@ -152,7 +152,7 @@ mod backend_impl {
 
             match control {
                 Some(control) => {
-                    let on_off_control = if control.is_on != *cluster.on_off.is_on {
+                    let on_off_control = if control.is_on != cluster.on_off.is_on {
                         Some(OnOffAction::SetIsOn {
                             is_on: control.is_on,
                         })
@@ -160,7 +160,7 @@ mod backend_impl {
                         None
                     };
 
-                    let level_control = if Some(control.level) != *cluster.level_control.level {
+                    let level_control = if Some(control.level) != cluster.level_control.level {
                         Some(LevelControlAction::SetLevel {
                             level: control.level,
                         })
@@ -170,29 +170,29 @@ mod backend_impl {
 
                     let color_control = {
                         let color = cluster.color_control;
-                        let color_mode = *color.color_mode;
+                        let color_mode = color.shared.color_mode;
 
                         match control.color {
                             LightControlColor::HueSaturation { hue, saturation }
                                 if let Some(color) = color.hue_saturation.as_ref()
                                     && (color_mode != ColorControlMode::HueSaturation
-                                        || hue != *color.current_hue
-                                        || saturation != *color.current_saturation) =>
+                                        || hue != color.current_hue
+                                        || saturation != color.current_saturation) =>
                             {
                                 Some(ColorControlAction::SetHueSaturation { hue, saturation })
                             }
                             LightControlColor::Temperature { temperature }
                                 if let Some(color) = color.temperature.as_ref()
                                     && (color_mode != ColorControlMode::Temperature
-                                        || temperature != *color.color_temperature_mireds) =>
+                                        || temperature != color.color_temperature_mireds) =>
                             {
                                 Some(ColorControlAction::SetColorTemperature { temperature })
                             }
                             LightControlColor::Xy { x, y }
                                 if let Some(color) = color.xy.as_ref()
                                     && (color_mode != ColorControlMode::Xy
-                                        || x != *color.current_x
-                                        || y != *color.current_y) =>
+                                        || x != color.current_x
+                                        || y != color.current_y) =>
                             {
                                 Some(ColorControlAction::SetXY { x, y })
                             }
@@ -205,7 +205,7 @@ mod backend_impl {
                     result.extend(on_off_control.map(Into::into));
                 }
                 None => {
-                    if *cluster.on_off.is_on {
+                    if cluster.on_off.is_on {
                         result.push(OnOffAction::SetIsOn { is_on: false }.into());
                     }
                 }

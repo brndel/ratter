@@ -1,0 +1,26 @@
+[package]
+name = "wobble-graph"
+version = "0.1.0"
+edition = "2024"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+dioxus.workspace = true
+
+gloo-timers.workspace = true
+
+derive_more = {workspace = true, features = ["add", "add_assign", "mul", "mul_assign"]}
+
+rand.workspace = true
+
+getrandom_0_3_4.workspace = true
+getrandom_0_4_3.workspace = true
+
+[features]
+web = [
+    "dioxus/web",
+    "getrandom_0_3_4/wasm_js",
+    "getrandom_0_4_3/wasm_js",
+]
+default = []

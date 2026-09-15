@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::device::clusters::{ChangeEvent, define_cluster_macro::define_cluster};
+use crate::device::clusters::define_cluster_macro::define_cluster;
 
 define_cluster!(
     struct ElectricalPowerMeasurement, enum ElectricalPowerMeasurementChange, electrical_power_measurement {
@@ -20,7 +20,7 @@ define_cluster!(
     }
 );
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ElectricalPowerMode {
     Ac,
     Dc,

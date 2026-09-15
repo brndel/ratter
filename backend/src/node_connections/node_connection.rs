@@ -6,10 +6,13 @@ use std::sync::{
 use dioxus::logger::tracing::info;
 use matter_controller::{AttributeReport, EventPath, Node, ReadPath};
 use shared_core::{
-    backend::{FromAttr, FromNode}, device::{
+    backend::{FromAttr, FromNode},
+    device::{
         AttrChange, ClusterEvent, Device,
         device_registry::{DeviceConnectionStage, DeviceSubscriptionStatus},
-    }, event::{ActionEvent, AttrChangeEvent, AttrChangeSource, DeviceEvent}, id::{AttrId, ClusterId, EndpointId},
+    },
+    event::{ActionEvent, AttrChangeEvent, AttrChangeSource, DeviceEvent, DeviceStatusEvent},
+    id::{AttrId, ClusterId, EndpointId},
 };
 use tokio::sync::Semaphore;
 use tokio_util::sync::{CancellationToken, DropGuard};
@@ -55,7 +58,12 @@ impl NodeConnection {
                 };
 
                 match result {
-                    Ok(device) => tx.send(DeviceEvent::Connected { device }).await,
+                    Ok(device) => {
+                        tx.send(DeviceEvent::Status {
+                            event: DeviceStatusEvent::Connected { device },
+                        })
+                        .await
+                    }
                     Err(err) => {
                         tx.send_connection_stage(DeviceConnectionStage::Error(err.to_string()))
                             .await;
@@ -94,7 +102,11 @@ impl NodeConnection {
 
         let read_paths = attr_ids
             .clone()
-            .flat_map(|(endpoint, cluster, attr_ids)| attr_ids.into_iter().map(move |attr| ReadPath::concrete(endpoint, cluster, attr)))
+            .flat_map(|(endpoint, cluster, attr_ids)| {
+                attr_ids
+                    .into_iter()
+                    .map(move |attr| ReadPath::concrete(endpoint, cluster, attr))
+            })
             .collect::<Vec<_>>();
 
         let event_paths = attr_ids
@@ -186,8 +198,9 @@ impl NodeConnection {
         })
     }
 
-
-    fn attr_ids_from_device(device: &Device) -> impl Iterator<Item = (EndpointId, ClusterId, impl Iterator<Item = AttrId>)> + Clone {
+    fn attr_ids_from_device(
+        device: &Device,
+    ) -> impl Iterator<Item = (EndpointId, ClusterId, impl Iterator<Item = AttrId>)> + Clone {
         device.endpoints.iter().flat_map(|(endpoint_id, endpoint)| {
             let clusters_with_attr_ids = endpoint
                 .clusters
@@ -195,7 +208,9 @@ impl NodeConnection {
                 .iter()
                 .filter_map(|id| id.listen_attrs.as_ref().map(|attrs| (id.id, attrs)));
 
-            clusters_with_attr_ids.map(move |(cluster_id, attr_ids)| (*endpoint_id, cluster_id, attr_ids.iter().cloned()))
+            clusters_with_attr_ids.map(move |(cluster_id, attr_ids)| {
+                (*endpoint_id, cluster_id, attr_ids.iter().cloned())
+            })
         })
     }
 }

@@ -42,7 +42,7 @@ macro_rules! read_decode {
                 }
             }
 
-            ($($var_name.expect("at least one argument did not get sent back")),*)
+            ($($var_name.expect(concat!("argument ", stringify!($var_name), " did not get sent back"))),*)
         };
     }
 }

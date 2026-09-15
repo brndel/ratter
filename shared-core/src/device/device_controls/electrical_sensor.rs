@@ -27,9 +27,9 @@ impl<'a> TryFrom<&'a Clusters> for ElectricalSensorParamsClusters<'a> {
 impl<'a> From<ElectricalSensorParamsClusters<'a>> for ElectricalSensorParams {
     fn from(value: ElectricalSensorParamsClusters<'a>) -> Self {
         Self {
-            voltage: (*value.power_measurement.voltage).unwrap_or_default(),
-            active_power: (*value.power_measurement.active_power).unwrap_or_default(),
-            total_energy_imported: (*value.energy_measurement.cumulative_energy_imported)
+            voltage: value.power_measurement.voltage.unwrap_or_default(),
+            active_power: value.power_measurement.active_power.unwrap_or_default(),
+            total_energy_imported: value.energy_measurement.cumulative_energy_imported
                 .energy
                 .unwrap_or_default(),
         }

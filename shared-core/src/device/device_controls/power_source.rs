@@ -25,10 +25,9 @@ impl<'a> TryFrom<&'a Clusters> for PowerSourceParamsClusters<'a> {
 impl<'a> From<PowerSourceParamsClusters<'a>> for PowerSourceParams {
     fn from(value: PowerSourceParamsClusters<'a>) -> Self {
         Self {
-            battery_percent_remaining: (*value.power_source.bat_percent_remaining)
-                .unwrap_or_default(),
-            battery_quantity: (*value.power_source.bat_quantity),
-            battery_kind: (*value.power_source.bat_kind),
+            battery_percent_remaining: value.power_source.bat_percent_remaining.unwrap_or_default(),
+            battery_quantity: value.power_source.bat_quantity,
+            battery_kind: value.power_source.bat_kind,
         }
     }
 }

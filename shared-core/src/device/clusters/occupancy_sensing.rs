@@ -1,7 +1,6 @@
 use matter_clusters::r#gen::occupancy_sensing::OccupancyBitmap;
-use serde::{Deserialize, Serialize};
 
-use crate::device::clusters::{ChangeEvent, define_cluster_macro::define_cluster};
+use crate::device::clusters::define_cluster_macro::define_cluster;
 
 define_cluster!(
 struct OccupancySensing, enum OccupancySensingChange, occupancy_sensing {

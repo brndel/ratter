@@ -20,7 +20,7 @@ pub fn LightControlView(
 
     let level = move || {
         let control = level_control.read();
-        control.level.unwrap_or(*control.max_level)
+        control.level.unwrap_or(control.max_level)
     };
 
     let call_control_callback = move || {
@@ -35,9 +35,9 @@ pub fn LightControlView(
         div { class: "device-control light",
             button {
                 class: "on-off-button",
-                class: if *on_off.read().is_on { "on" },
+                class: if on_off.read().is_on { "on" },
                 onclick: move |_| {
-                    on_off.with_mut(|on_off| on_off.is_on.set_user(!*on_off.is_on));
+                    on_off.with_mut(|on_off| on_off.is_on = !on_off.is_on);
                     call_control_callback()
                 },
 
@@ -46,18 +46,18 @@ pub fn LightControlView(
 
             div {
                 class: "maybe-disabled-controls",
-                class: if !*on_off().is_on { "disabled" },
+                class: if !on_off().is_on { "disabled" },
                 input {
                     class: "brightness-slider",
                     r#type: "range",
                     oninput: move |ev| {
                         if let Some(value) = ev.value().parse().ok() {
-                            level_control.with_mut(|level| level.level.set_user(Some(value)))
+                            level_control.with_mut(|level| level.level = Some(value))
                         }
                     },
                     onmouseup: move |_| { call_control_callback() },
-                    min: *level_control.read().min_level,
-                    max: *level_control.read().max_level,
+                    min: level_control.read().min_level,
+                    max: level_control.read().max_level,
                     value: "{level()}",
                 }
 
@@ -67,9 +67,9 @@ pub fn LightControlView(
                 }
 
                 TabBar {
-                    value: *color_control().color_mode,
+                    value: color_control().shared.color_mode,
                     on_select: move |value| {
-                        color_control.with_mut(|control| control.color_mode.set_user(value));
+                        color_control.with_mut(|control| control.shared.color_mode = value);
                         call_control_callback()
                     },
                     if color_control().hue_saturation.is_some() {
@@ -81,7 +81,7 @@ pub fn LightControlView(
                                 // TabBarItem { value: ColorControlMode::Xy, "Xy" }
                 }
 
-                match *color_control().color_mode {
+                match color_control().shared.color_mode {
                     ColorControlMode::HueSaturation => {
                         if let Some(hue_sat) = &color_control().hue_saturation {
                             rsx! {
@@ -93,7 +93,7 @@ pub fn LightControlView(
                                             color_control
                                                 .with_mut(|control| {
                                                     if let Some(hue_saturation) = &mut control.hue_saturation {
-                                                        hue_saturation.current_hue.set_user(value)
+                                                        hue_saturation.current_hue = value;
                                                     }
                                                 })
                                         }
@@ -101,7 +101,7 @@ pub fn LightControlView(
                                     min: 0,
                                     max: 254,
                                     onmouseup: move |_| { call_control_callback() },
-                                    value: "{*hue_sat.current_hue}",
+                                    value: "{hue_sat.current_hue}",
                                 }
 
                                 input {
@@ -112,7 +112,7 @@ pub fn LightControlView(
                                             color_control
                                                 .with_mut(|control| {
                                                     if let Some(hue_saturation) = &mut control.hue_saturation {
-                                                        hue_saturation.current_saturation.set_user(value)
+                                                        hue_saturation.current_saturation = value;
                                                     }
                                                 })
                                         }
@@ -120,7 +120,7 @@ pub fn LightControlView(
                                     min: 0,
                                     max: 254,
                                     onmouseup: move |_| { call_control_callback() },
-                                    value: "{*hue_sat.current_saturation}",
+                                    value: "{hue_sat.current_saturation}",
                                 }
                             }
                         } else {
@@ -134,24 +134,22 @@ pub fn LightControlView(
 
                                 input {
                                     class: "temperature-slider",
-                                    style: "background: linear-gradient(to right in hsl, {
-                                                                                                    ColorControl::temperature_mireds_to_css_color(*hue_sat.color_temperature_mireds_min, 255)}, {
-                                                                                                    ColorControl::temperature_mireds_to_css_color(*hue_sat.color_temperature_mireds_max, 255)})",
+                                    style: "background: linear-gradient(to right in hsl, { ColorControl::temperature_mireds_to_css_color(hue_sat.color_temperature_mireds_min, 255) }, { ColorControl::temperature_mireds_to_css_color(hue_sat.color_temperature_mireds_max, 255) })",
                                     r#type: "range",
                                     oninput: move |ev| {
                                         if let Some(value) = ev.value().parse().ok() {
                                             color_control
                                                 .with_mut(|control| {
                                                     if let Some(temperature) = &mut control.temperature {
-                                                        temperature.color_temperature_mireds.set_user(value)
+                                                        temperature.color_temperature_mireds = value;
                                                     }
                                                 })
                                         }
                                     },
-                                    min: *hue_sat.color_temperature_mireds_min,
-                                    max: *hue_sat.color_temperature_mireds_max,
+                                    min: hue_sat.color_temperature_mireds_min,
+                                    max: hue_sat.color_temperature_mireds_max,
                                     onmouseup: move |_| { call_control_callback() },
-                                    value: "{*hue_sat.color_temperature_mireds}",
+                                    value: "{hue_sat.color_temperature_mireds}",
                                 }
                             }
                         } else {

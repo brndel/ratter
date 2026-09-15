@@ -4,6 +4,7 @@ mod component;
 mod light_control;
 mod page;
 mod server_state;
+mod device_details_ota;
 
 use jiff::{Zoned, tz::TimeZone};
 use page::*;
@@ -40,19 +41,15 @@ use shared_core::{
 };
 
 use crate::{
-    attr_dump::AttrDumpView,
-    cluster_display::{
+    attr_dump::AttrDumpView, cluster_display::{
         electrical_sensor::display_electrical_sensor, humidity_sensor::display_humidity_sensor,
         occupancy_sensor::display_occupancy_sensor, power_source::display_power_source,
         switch::display_switch, temperature_sensor::display_temperature_sensor,
-    },
-    component::{
+    }, component::{
         color_label::{ColorLabel, ColorLabelStyle},
         dialog_button::{DialogButton, DialogContent, DialogRoot},
         popover_button::{PopoverButton, PopoverContent, PopoverRoot},
-    },
-    light_control::LightControlView,
-    server_state::ServerState,
+    }, device_details_ota::DeviceDetailsOta, light_control::LightControlView, server_state::ServerState,
 };
 
 #[derive(Debug, Clone, Routable, PartialEq)]
@@ -65,6 +62,8 @@ enum Route {
     Scenes {},
     #[route("/assets")]
     AssetsPage {},
+    #[route("/thread_graph")]
+    ThreadGraphPage {},
     #[route("/endpoints")]
     EndpointsPage {},
     #[route("/commission")]
@@ -115,7 +114,6 @@ fn App() -> Element {
     }
 }
 
-/// Home page
 #[component]
 fn Home() -> Element {
     rsx! {
@@ -123,27 +121,6 @@ fn Home() -> Element {
     }
 }
 
-/// Blog page
-// #[component]
-// pub fn Blog(id: i32) -> Element {
-//     rsx! {
-//         div { id: "blog",
-
-//             // Content
-//             h1 { "This is blog #{id}!" }
-//             p {
-//                 "In blog #{id}, we show how the Dioxus router works and how URL parameters can be passed as props to our route components."
-//             }
-
-//             // Navigation links
-//             Link { to: Route::Blog { id: id - 1 }, "Previous" }
-//             span { " <---> " }
-//             Link { to: Route::Blog { id: id + 1 }, "Next" }
-//         }
-//     }
-// }
-
-/// Shared navbar component.
 #[component]
 fn Navbar() -> Element {
     let connection_state = use_context::<ServerState>().connection_state;
@@ -155,6 +132,7 @@ fn Navbar() -> Element {
             Link { to: Route::CommissionForm {}, "Commission" }
             Link { to: Route::AssetsPage {}, "Assets" }
             Link { to: Route::EndpointsPage {}, "Endpoints" }
+            Link { to: Route::ThreadGraphPage {}, "Thread Graph" }
 
             div { class: "spacer" }
 
@@ -299,17 +277,18 @@ fn DeviceListEntry(device_id: u64, device: Store<DeviceInitStatus>) -> Element {
     let get_label = move |label_id| assets.read().get_asset::<Label>(label_id).cloned();
 
     let header = rsx! {
-        if let Some(device) = get_device(device_id) {
-            h2 { {device.config.name.clone()} }
+        if let Some(device_asset) = get_device(device_id) {
+            {device_asset.config.name.clone()}
+
             div { class: "h-list",
-                if let Some(room_id) = device.config.room && let Some(room) = get_room(room_id) {
+                if let Some(room_id) = device_asset.config.room && let Some(room) = get_room(room_id) {
                     ColorLabel {
                         color: room.color,
                         text: room.name.to_owned(),
                         style: ColorLabelStyle::Room,
                     }
                 }
-                for label in &device.config.labels {
+                for label in &device_asset.config.labels {
                     if let Some(label) = get_label(*label) {
                         ColorLabel {
                             color: label.color,
@@ -379,6 +358,25 @@ fn DeviceListEntry(device_id: u64, device: Store<DeviceInitStatus>) -> Element {
                         "Device id {device_id}"
 
                         {details}
+
+                        if let DeviceInitStatusStoreTransposed::Connected { device, subscription_status: _ } = device
+                            .transpose() && let Some(endpoint) = device.endpoints().get(0)
+                            && let Some(ota) = endpoint
+                                .clusters()
+                                .ota_software_update_requestor()
+                                .transpose()
+                        {
+                            DialogRoot {
+                                DialogButton { "OTA" }
+                                DialogContent { title: "Details & OTA",
+                                    DeviceDetailsOta {
+                                        device_id,
+                                        information: (&*device.basic_information().read()).clone(),
+                                        ota: (&*ota.read()).clone(),
+                                    }
+                                }
+                            }
+                        }
 
                         button {
                             onclick: move |_| async move {
@@ -544,7 +542,7 @@ fn DeviceTypeView(
                     PopoverButton { hide_button: true,
                         div {
                             class: "color-block",
-                            class: if !*on_off.read().is_on { "is-off" },
+                            class: if !on_off.read().is_on { "is-off" },
                             style: "background-color: {color_control.read().css_color(level_control.read().level.clone().unwrap_or_default())}",
                         }
                     }

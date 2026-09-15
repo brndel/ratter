@@ -1,6 +1,5 @@
 use matter_clusters::types::Nullable;
-use serde::{Deserialize, Serialize};
-use crate::device::clusters::{ChangeEvent, define_cluster_macro::define_cluster};
+use crate::device::clusters::define_cluster_macro::define_cluster;
 
 define_cluster!(
 struct TemperatureMeasurement, enum TemperatureMeasurementChange, temperature_measurement {

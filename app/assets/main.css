@@ -446,6 +446,17 @@ button.on-off-button {
     gap: 4pt;
 }
 
+.v-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4pt;
+}
+
+.card {
+    border-radius: 6pt;
+    background-color: #30353f;
+}
+
 
 .color-label {
     display: flex;

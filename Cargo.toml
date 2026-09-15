@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["app", "backend", "shared-core"]
+members = ["app", "backend", "shared-core", "wobble-graph"]
 
 default-members = ["app"]
 
@@ -8,18 +8,19 @@ default-members = ["app"]
 app.path = "app"
 backend.path = "backend"
 shared-core.path = "shared-core"
+wobble-graph.path = "wobble-graph"
 
-matter-controller = { version = "0.12.0", features = ["ble"]}
-matter-clusters = "0.5.0"
-matter-interaction = "0.4.1"
-matter-commissioning = "0.8.1"
-matter-codec = "0.3.1"
+# matter-controller = { version = "0.14.0", features = ["ble"] }
+# matter-clusters = "0.5.0"
+# matter-interaction = "0.4.1"
+# matter-commissioning = "0.10.0"
+# matter-codec = "0.3.1"
 
-# matter-controller = { git = "https://github.com/brndel/matter-rust", rev = "184ea1de8f39a2ff0cb92da9a8e9d39c9257a6ae", features = ["ble"] }
-# matter-clusters = { git = "https://github.com/brndel/matter-rust", rev = "184ea1de8f39a2ff0cb92da9a8e9d39c9257a6ae" }
-# matter-interaction = { git = "https://github.com/brndel/matter-rust", rev = "184ea1de8f39a2ff0cb92da9a8e9d39c9257a6ae" }
-# matter-commissioning = { git = "https://github.com/brndel/matter-rust", rev = "184ea1de8f39a2ff0cb92da9a8e9d39c9257a6ae" }
-# matter-codec = { git = "https://github.com/brndel/matter-rust", rev = "184ea1de8f39a2ff0cb92da9a8e9d39c9257a6ae" }
+matter-controller = { git = "https://github.com/brndel/matter-rust", rev = "ddf4ad0bac5759471f31d4626bebb4deeaaa45f7", features = ["ble"] }
+matter-clusters = { git = "https://github.com/brndel/matter-rust", rev = "ddf4ad0bac5759471f31d4626bebb4deeaaa45f7" }
+matter-interaction = { git = "https://github.com/brndel/matter-rust", rev = "ddf4ad0bac5759471f31d4626bebb4deeaaa45f7" }
+matter-commissioning = { git = "https://github.com/brndel/matter-rust", rev = "ddf4ad0bac5759471f31d4626bebb4deeaaa45f7" }
+matter-codec = { git = "https://github.com/brndel/matter-rust", rev = "ddf4ad0bac5759471f31d4626bebb4deeaaa45f7" }
 
 
 # matter-controller = { path = "../matter-rust/crates/matter-controller", features = ["ble"] }
@@ -30,25 +31,28 @@ matter-codec = "0.3.1"
 
 
 dioxus = { version = "0.7.9", features = ["router", "fullstack"] }
-dioxus-html = { version = "0.7.9", features = ["serialize"]}
+dioxus-html = { version = "0.7.9", features = ["serialize"] }
 dioxus-stores = { version = "0.7.9" }
-dioxus-free-icons = { version = "0.10", features = [ "font-awesome-solid" ]}
-web-sys = { version = "0.3.103", features = ["ToggleEvent"]}
+dioxus-free-icons = { version = "0.10", features = ["font-awesome-solid"] }
+web-sys = { version = "0.3.103", features = ["ToggleEvent"] }
 
 serde = "1.0"
 anyhow = "1.0"
+thiserror = "2.0"
 futures = "0.3"
 derive_more = "2.1"
+nest_struct = "0.5"
 
 notify = "8.2.0"
 tokio = "1.53"
 tokio-util = "0.7.19"
 tokio-stream = "0.1.19"
-tokio-task-pool = "0.1"
+gloo-timers = "0.4"
 hex = "0.4.3"
+base64 = "0.23"
 
-toml = "1.1.3+spec-1.1.0"
-jiff = { version = "0.2.35", features = ["serde"]}
+toml = "1.1.5+spec-1.1.0"
+jiff = { version = "0.2.35", features = ["serde"] }
 rand = "0.10.2"
 either_of = "0.1.9"
 itertools = "0.15"
@@ -56,3 +60,10 @@ itertools = "0.15"
 getrandom_0_2_17 = { package = "getrandom", version = "0.2.17" }
 getrandom_0_3_4 = { package = "getrandom", version = "0.3.4" }
 getrandom_0_4_3 = { package = "getrandom", version = "0.4.3" }
+
+reqwest = {version = "0.13", features = ["json"]}
+sha2 = "0.11"
+sha3 = "0.12"
+
+# backend
+toasty = { version = "0.10.0", default-features = false, features = ["sqlite", "serde", "jiff"] }

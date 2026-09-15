@@ -40,7 +40,7 @@ impl NodeConnections {
         Self {
             tx,
             connections: Default::default(),
-            connection_semaphore: Arc::new(Semaphore::new(2))
+            connection_semaphore: Arc::new(Semaphore::new(4))
         }
     }
 

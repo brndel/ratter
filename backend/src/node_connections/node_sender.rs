@@ -1,5 +1,9 @@
 use jiff::Timestamp;
-use shared_core::{device::device_registry::{DeviceConnectionStage, DeviceSubscriptionStatus}, event::DeviceEvent, id::DeviceId};
+use shared_core::{
+    device::device_registry::{DeviceConnectionStage, DeviceSubscriptionStatus},
+    event::{DeviceEvent, DeviceStatusEvent},
+    id::DeviceId,
+};
 use tokio::sync::mpsc::Sender;
 
 use crate::node_connections::NodeConnectionEvent;
@@ -7,9 +11,8 @@ use crate::node_connections::NodeConnectionEvent;
 #[derive(Clone)]
 pub struct NodeSender {
     node_id: DeviceId,
-    tx: Sender<NodeConnectionEvent>
+    tx: Sender<NodeConnectionEvent>,
 }
-
 
 impl NodeSender {
     pub fn new(node_id: DeviceId, tx: Sender<NodeConnectionEvent>) -> Self {
@@ -17,15 +20,29 @@ impl NodeSender {
     }
 
     pub async fn send(&self, event: DeviceEvent) {
-        let _ = self.tx.send(NodeConnectionEvent { node_id: self.node_id, event }).await;
+        let _ = self
+            .tx
+            .send(NodeConnectionEvent {
+                node_id: self.node_id,
+                event,
+            })
+            .await;
     }
 
     pub async fn send_connection_stage(&self, stage: DeviceConnectionStage) {
-        self.send(DeviceEvent::Connecting { timestamp: Timestamp::now(), stage }).await
+        self.send(DeviceEvent::Status {
+            event: DeviceStatusEvent::Connecting {
+                timestamp: Timestamp::now(),
+                stage,
+            },
+        })
+        .await
     }
 
-
     pub async fn send_subsription_status(&self, status: DeviceSubscriptionStatus) {
-        self.send(DeviceEvent::SubscriptionStatus { status }).await
+        self.send(DeviceEvent::Status {
+            event: DeviceStatusEvent::SubscriptionStatus { status },
+        })
+        .await
     }
 }

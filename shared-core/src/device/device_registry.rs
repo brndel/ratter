@@ -9,8 +9,7 @@ use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    device::{Device, EndpointTarget, clusters::Clusters},
-    event::DeviceEvent,
+    device::{Device, EndpointTarget, clusters::Clusters}, event::{DeviceEvent, DeviceStatusEvent}, id::DeviceId,
 };
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Store)]
@@ -53,28 +52,30 @@ impl DeviceRegistry {
 
     pub fn handle_event(&mut self, device_id: u64, event: DeviceEvent) {
         match event {
-            DeviceEvent::Connecting { timestamp, stage } => {
-                self.devices
-                    .insert(device_id, DeviceInitStatus::Connecting { timestamp, stage });
-            }
-            DeviceEvent::Connected { device } => {
-                self.devices.insert(
-                    device_id,
-                    DeviceInitStatus::Connected {
-                        device,
-                        subscription_status: None,
-                    },
-                );
-            }
-            DeviceEvent::SubscriptionStatus { status } => {
-                if let Some(DeviceInitStatus::Connected {
-                    subscription_status,
-                    ..
-                }) = self.devices.get_mut(&device_id)
-                {
-                    *subscription_status = Some(status)
+            DeviceEvent::Status { event } => match event {
+                DeviceStatusEvent::Connecting { timestamp, stage } => {
+                    self.devices
+                        .insert(device_id, DeviceInitStatus::Connecting { timestamp, stage });
                 }
-            }
+                DeviceStatusEvent::Connected { device } => {
+                    self.devices.insert(
+                        device_id,
+                        DeviceInitStatus::Connected {
+                            device,
+                            subscription_status: None,
+                        },
+                    );
+                }
+                DeviceStatusEvent::SubscriptionStatus { status } => {
+                    if let Some(DeviceInitStatus::Connected {
+                        subscription_status,
+                        ..
+                    }) = self.devices.get_mut(&device_id)
+                    {
+                        *subscription_status = Some(status)
+                    }
+                }
+            },
             DeviceEvent::AttrChange { event } => {
                 let Some(DeviceInitStatus::Connected { device, .. }) =
                     self.devices.get_mut(&device_id)
@@ -91,7 +92,7 @@ impl DeviceRegistry {
                     return;
                 };
 
-                endpoint.clusters.handle_change(event.change, event.source)
+                endpoint.clusters.handle_change(event.change);
             }
             DeviceEvent::Event { event } => {
                 #[cfg(feature = "backend")]
@@ -99,6 +100,18 @@ impl DeviceRegistry {
             }
         }
     }
+
+
+    pub fn get_device(&self, device: DeviceId) -> Option<&Device> {
+        let device = match self.devices.get(&device) {
+            Some(DeviceInitStatus::Connected { device, .. }) => device,
+            _ => return None,
+        };
+
+
+        Some(&device)
+    }
+
 
     pub fn get_cluster(&self, endpoint: EndpointTarget) -> Option<&Clusters> {
         let device = match self.devices.get(&endpoint.device) {
@@ -109,6 +122,14 @@ impl DeviceRegistry {
         let endpoint = device.endpoints.get(&endpoint.endpoint)?;
 
         Some(&endpoint.clusters)
+    }
+
+    pub fn is_connected(&self, device: DeviceId) -> bool {
+        self.devices.get(&device).is_some_and(|status| matches!(status, DeviceInitStatus::Connected { .. }))
+    }
+
+    pub fn devices(&self) -> impl Iterator<Item = (&DeviceId, &DeviceInitStatus)> {
+        self.devices.iter()
     }
 
     pub fn devices_for_store(
