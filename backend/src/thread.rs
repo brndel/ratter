@@ -4,6 +4,7 @@ use anyhow::{anyhow, bail};
 use dioxus::fullstack::reqwest;
 use matter_codec::Value;
 use matter_controller::{Node, ReadPath};
+use nest_struct::nest_struct;
 use serde::Deserialize;
 use shared_core::{
     id::{AttrId, ClusterId},
@@ -144,25 +145,25 @@ fn bool(value: Value) -> anyhow::Result<bool> {
 
 pub async fn read_otbr_address_map(rest_endpoint: &str) -> anyhow::Result<BTreeMap<String, u64>> {
     let result = reqwest::get(rest_endpoint).await.unwrap();
-    let entries = result.json::<Vec<OtbrDiagnosticsResponse>>().await?;
+    let response = result.json::<OtbrDiagnosticsResponse>().await?;
 
-    Ok(entries
+    Ok(response.data
         .into_iter()
-        .flat_map(|entry| {
+        .map(|entry| {
             let ext_addr = u64::from_str_radix(&entry.ext_address, 16).unwrap();
 
-            entry
-                .ip6_address_list
-                .into_iter()
-                .map(move |address| (address, ext_addr ))
+            (entry.omr_ipv6_address, ext_addr)
         })
         .collect())
 }
 
+
+#[nest_struct]
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct OtbrDiagnosticsResponse {
-    #[serde(rename = "ExtAddress")]
-    ext_address: String,
-    #[serde(rename = "IP6AddressList")]
-    ip6_address_list: Vec<String>,
+    data: Vec<nest! {
+        ext_address: String,
+        omr_ipv6_address: String
+    }>,
 }

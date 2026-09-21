@@ -336,13 +336,13 @@ impl MatterManagerInner {
                     reconnect_interval.tick().await;
                     info!("reconnecting all devices in need of reconnecting");
 
-                    // let nodes = controller
-                    //     .nodes()
-                    //     .await
-                    //     .unwrap()
-                    //     .into_iter()
-                    //     .map(|info| info.node_id);
-                    let nodes = [2, 9, 39, 45, 43].iter().cloned();
+                    let nodes = controller
+                        .nodes()
+                        .await
+                        .unwrap()
+                        .into_iter()
+                        .map(|info| info.node_id);
+                    // let nodes = [2, 9, 39, 45, 43].iter().cloned();
 
                     let total_nodes_count = nodes.len();
 
