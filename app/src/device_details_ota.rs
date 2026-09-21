@@ -1,8 +1,6 @@
 use dioxus::{fullstack::JsonEncoding, prelude::*};
 use shared_core::{
-    device::{clusters::BasicInformation, device_controls::OtaRequestor},
-    id::DeviceId,
-    ota::OtaProductId,
+    device::{clusters::{BasicInformation, OperationalCredentials}, device_controls::OtaRequestor}, id::DeviceId, ota::OtaProductId,
 };
 
 use crate::{MatterManagerExt, server_state::ServerState};
@@ -11,6 +9,7 @@ use crate::{MatterManagerExt, server_state::ServerState};
 pub fn DeviceDetailsOta(
     device_id: DeviceId,
     information: BasicInformation,
+    operational_credentials: OperationalCredentials,
     ota: OtaRequestor,
 ) -> Element {
     let ota_manager = use_context::<ServerState>().ota_manager;
@@ -27,13 +26,23 @@ pub fn DeviceDetailsOta(
             span { "vid {information.vendor_id}" }
             span { "pid {information.product_id}" }
             span { "{information.software_version_string} ({information.software_version})" }
-            h2 { "Ota state" }
+
+            h2 { "Fabrics" }
+            pre { "{operational_credentials:#?}" }
 
             ul {
-                li { "Update possible: {ota.update_possible:?}" }
-                li { "Update state: {ota.update_state:?}" }
-                li { "Update progress: {ota.update_state_progress:?}" }
+                for fabric in operational_credentials.fabrics {
+                    button {
+                        onclick: move |_| async move {
+                            remove_fabric(device_id, fabric.fabric_index).await.unwrap();
+                        },
+                        "remove from fabric '{fabric.label}' ({fabric.fabric_index})"
+                    }
+                }
             }
+
+            h2 { "Ota state" }
+            pre { "{ota:#?}" }
 
             h2 { "Versions" }
             button {
@@ -106,6 +115,14 @@ async fn load_ota_versions(device: OtaProductId) -> Result<(), ServerFnError> {
 #[post("/api/apply_update", matter: MatterManagerExt)]
 async fn update_device(device: DeviceId, version: u32) -> Result<(), ServerFnError> {
     matter.ota_update_device(device, version).await?;
+
+    Ok(())
+}
+
+
+#[post("/api/remove_fabric", matter: MatterManagerExt)]
+async fn remove_fabric(device: DeviceId, fabric_index: u8) -> Result<(), ServerFnError> {
+    matter.remove_fabric(device, fabric_index).await?;
 
     Ok(())
 }

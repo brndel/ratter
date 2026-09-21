@@ -14,6 +14,7 @@ mod power_source;
 mod relative_humidity_measurement;
 mod switch;
 mod temperature_measurement;
+mod operational_credentials;
 
 pub use basic_information::*;
 pub use color_control::*;
@@ -32,6 +33,7 @@ pub use power_source::*;
 pub use relative_humidity_measurement::*;
 pub use switch::*;
 pub use temperature_measurement::*;
+pub use operational_credentials::*;
 
 use crate::{
     device::attr_change::AttrChange,
@@ -55,6 +57,7 @@ pub struct Clusters {
     pub temperature_measurement: Option<TemperatureMeasurement>,
     pub relative_humidity_measurement: Option<RelativeHumidityMeasurement>,
     pub ota_software_update_requestor: Option<OtaSoftwareUpdateRequestor>,
+    pub operational_credentials: Option<OperationalCredentials>,
     pub cluster_ids: Vec<ClustersClusterId>,
 }
 
@@ -113,6 +116,11 @@ impl Clusters {
                     .is_some_and(|state| change.apply(state))
             }
             AttrChange::OtaSoftwareUpdateRequestor(change) => {
+                <Self as AsMut<Option<_>>>::as_mut(self)
+                    .as_mut()
+                    .is_some_and(|state| change.apply(state))
+            }
+            AttrChange::OperationalCredentials(change) => {
                 <Self as AsMut<Option<_>>>::as_mut(self)
                     .as_mut()
                     .is_some_and(|state| change.apply(state))
@@ -210,6 +218,12 @@ mod impl_from_endpoint {
                             Some(OtaSoftwareUpdateRequestor::from_endpoint(node, endpoint).await?);
 
                         listen_attrs = Some(OtaSoftwareUpdateRequestor::LISTEN_ATTRS)
+                    }
+                    OperationalCredentials::CLUSTER_ID => {
+                        result.operational_credentials =
+                            Some(OperationalCredentials::from_endpoint(node, endpoint).await?);
+
+                        listen_attrs = Some(OperationalCredentials::LISTEN_ATTRS)
                     }
 
                     _ => {}

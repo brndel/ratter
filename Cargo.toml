@@ -16,11 +16,12 @@ wobble-graph.path = "wobble-graph"
 # matter-commissioning = "0.10.0"
 # matter-codec = "0.3.1"
 
-matter-controller = { git = "https://github.com/brndel/matter-rust", rev = "ddf4ad0bac5759471f31d4626bebb4deeaaa45f7", features = ["ble"] }
-matter-clusters = { git = "https://github.com/brndel/matter-rust", rev = "ddf4ad0bac5759471f31d4626bebb4deeaaa45f7" }
-matter-interaction = { git = "https://github.com/brndel/matter-rust", rev = "ddf4ad0bac5759471f31d4626bebb4deeaaa45f7" }
-matter-commissioning = { git = "https://github.com/brndel/matter-rust", rev = "ddf4ad0bac5759471f31d4626bebb4deeaaa45f7" }
-matter-codec = { git = "https://github.com/brndel/matter-rust", rev = "ddf4ad0bac5759471f31d4626bebb4deeaaa45f7" }
+matter-controller = { git = "https://github.com/brndel/matter-rust", rev = "6342c395fffea7edb36630a71f3877ed433ab164", features = ["ble"] }
+matter-clusters = { git = "https://github.com/brndel/matter-rust", rev = "6342c395fffea7edb36630a71f3877ed433ab164" }
+matter-interaction = { git = "https://github.com/brndel/matter-rust", rev = "6342c395fffea7edb36630a71f3877ed433ab164" }
+matter-commissioning = { git = "https://github.com/brndel/matter-rust", rev = "6342c395fffea7edb36630a71f3877ed433ab164" }
+matter-codec = { git = "https://github.com/brndel/matter-rust", rev = "6342c395fffea7edb36630a71f3877ed433ab164" }
+matter-bdx = { git = "https://github.com/brndel/matter-rust", rev = "6342c395fffea7edb36630a71f3877ed433ab164" }
 
 
 # matter-controller = { path = "../matter-rust/crates/matter-controller", features = ["ble"] }

@@ -1,6 +1,9 @@
-use std::sync::{
-    Arc,
-    atomic::{AtomicBool, Ordering},
+use std::{
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::Duration,
 };
 
 use dioxus::logger::tracing::info;
@@ -14,7 +17,7 @@ use shared_core::{
     event::{ActionEvent, AttrChangeEvent, AttrChangeSource, DeviceEvent, DeviceStatusEvent},
     id::{AttrId, ClusterId, EndpointId},
 };
-use tokio::sync::Semaphore;
+use tokio::{sync::Semaphore, time::Instant};
 use tokio_util::sync::{CancellationToken, DropGuard};
 
 use crate::node_connections::node_sender::NodeSender;
@@ -116,12 +119,23 @@ impl NodeConnection {
         tx.send_connection_stage(DeviceConnectionStage::StartingListeners)
             .await;
 
-        let mut sub = node.subscribe(&read_paths, &event_paths, 0, 60).await?;
+        let mut sub = node
+            .subscribe(
+                &read_paths,
+                &event_paths,
+                0,
+                5 * 60,
+            )
+            .await?;
+
+        info!("subscription started on node {} with max report {}s", node.node_id(), sub.max_report_interval().as_secs());
 
         tokio::spawn({
             let node_id = node.node_id();
             let tx = tx.clone();
             async move {
+                let start = Instant::now();
+
                 loop {
                     let Some(Some(event)) = token.run_until_cancelled(sub.next()).await else {
                         break;
@@ -138,6 +152,13 @@ impl NodeConnection {
                         matter_controller::SubscriptionEvent::Event(
                             matter_controller::EventReport::Data(report),
                         ) => {
+                            // Directly after subsribing the device sends old events from past connections.
+                            // When using automations, this leads to weird behaviour when buttons or other sensors get connected
+                            // So we ignore all events sent at the start of the subscription
+                            if Instant::now().duration_since(start) < Duration::from_secs(2) {
+                                info!("IGNORED event at start of subscription");
+                                continue;
+                            }
                             if let EventPath {
                                 endpoint: Some(endpoint),
                                 cluster: Some(cluster),

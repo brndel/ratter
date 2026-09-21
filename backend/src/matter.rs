@@ -224,6 +224,11 @@ impl MatterManager {
         let controls = self.0.controls.read().await;
         controls.active_scenes()
     }
+
+    pub async fn remove_fabric(&self, device: DeviceId, fabric_index: u8) -> anyhow::Result<()> {
+        self.0.controller.node(device).remove_fabric(fabric_index).await?;
+        Ok(())
+    }
 }
 
 impl MatterManager {
@@ -266,11 +271,13 @@ impl MatterManager {
             )
             .await?;
 
-        timeout(
-            Duration::from_mins(5),
-            self.0.controller.serve_ota(device, image, version, 9132),
+        let result = timeout(
+            Duration::from_mins(20),
+            self.0.controller.serve_ota_with_block_size(device, image, version, 5560, 256),
         )
-        .await??;
+        .await;
+        info!("SERVE_OTA is done: {result:?}");
+        result??;
 
         Ok(())
     }
@@ -329,13 +336,13 @@ impl MatterManagerInner {
                     reconnect_interval.tick().await;
                     info!("reconnecting all devices in need of reconnecting");
 
-                    let nodes = controller
-                        .nodes()
-                        .await
-                        .unwrap()
-                        .into_iter()
-                        .map(|info| info.node_id);
-                    // let nodes = [9, 40, 43, 2, 3].iter().cloned();
+                    // let nodes = controller
+                    //     .nodes()
+                    //     .await
+                    //     .unwrap()
+                    //     .into_iter()
+                    //     .map(|info| info.node_id);
+                    let nodes = [2, 9, 39, 45, 43].iter().cloned();
 
                     let total_nodes_count = nodes.len();
 

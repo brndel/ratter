@@ -15,6 +15,7 @@ pub enum AttrChange {
     TemperatureMeasurement(TemperatureMeasurementChange),
     RelativeHumidityMeasurement(RelativeHumidityMeasurementChange),
     OtaSoftwareUpdateRequestor(OtaSoftwareUpdateRequestorChange),
+    OperationalCredentials(OperationalCredentialsChange),
 }
 
 #[cfg(feature = "backend")]
@@ -66,6 +67,9 @@ use super::*;
                 }
                 <OtaSoftwareUpdateRequestorChange as ChangeEvent>::State::CLUSTER_ID => {
                     OtaSoftwareUpdateRequestorChange::from_attr_change(attr, value)?.into()
+                }
+                <OperationalCredentialsChange as ChangeEvent>::State::CLUSTER_ID => {
+                    OperationalCredentialsChange::from_attr_change(attr, value)?.into()
                 }
                 _ => return Err(anyhow::anyhow!("unkown cluster")),
             };

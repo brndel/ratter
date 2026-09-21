@@ -361,6 +361,10 @@ fn DeviceListEntry(device_id: u64, device: Store<DeviceInitStatus>) -> Element {
 
                         if let DeviceInitStatusStoreTransposed::Connected { device, subscription_status: _ } = device
                             .transpose() && let Some(endpoint) = device.endpoints().get(0)
+                            && let Some(operational_credentials) = endpoint
+                                .clusters()
+                                .operational_credentials()
+                                .transpose()
                             && let Some(ota) = endpoint
                                 .clusters()
                                 .ota_software_update_requestor()
@@ -372,6 +376,7 @@ fn DeviceListEntry(device_id: u64, device: Store<DeviceInitStatus>) -> Element {
                                     DeviceDetailsOta {
                                         device_id,
                                         information: (&*device.basic_information().read()).clone(),
+                                        operational_credentials: (&*operational_credentials.read()).clone(),
                                         ota: (&*ota.read()).clone(),
                                     }
                                 }
