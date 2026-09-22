@@ -1,23 +1,23 @@
 use std::{
     sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
-    time::Duration,
+        Arc, atomic::{AtomicBool, Ordering},
+    }, time::Duration,
 };
 
-use dioxus::logger::tracing::info;
-use matter_controller::{AttributeReport, EventPath, Node, ReadPath};
+use anyhow::anyhow;
+use dioxus::logger::tracing::{info, warn};
+use matter_controller::{AttributeReport, EventReportItem, Node, ReadPath};
+use persist::PersistDb;
 use shared_core::{
     backend::{FromAttr, FromNode},
     device::{
         AttrChange, ClusterEvent, Device,
         device_registry::{DeviceConnectionStage, DeviceSubscriptionStatus},
     },
-    event::{ActionEvent, AttrChangeEvent, AttrChangeSource, DeviceEvent, DeviceStatusEvent},
-    id::{AttrId, ClusterId, EndpointId},
+    event::{ActionEvent, AttrChangeEvent, AttrChangeSource, DeviceStatusEvent},
+    id::{AttrId, AttrPath, ClusterId, EndpointId, EventPath},
 };
-use tokio::{sync::Semaphore, time::Instant};
+use tokio::{sync::{Barrier, Notify, Semaphore}, time::Instant};
 use tokio_util::sync::{CancellationToken, DropGuard};
 
 use crate::node_connections::node_sender::NodeSender;
@@ -30,7 +30,7 @@ pub struct NodeConnection {
 }
 
 impl NodeConnection {
-    pub fn new(node: Node, tx: NodeSender, semaphore: Arc<Semaphore>) -> Self {
+    pub fn new(node: Node, tx: NodeSender, semaphore: Arc<Semaphore>, db: PersistDb) -> Self {
         let token = CancellationToken::new();
         let allow_timed_reconnect = Arc::new(AtomicBool::new(false));
 
@@ -49,11 +49,12 @@ impl NodeConnection {
                 let _permin = _permit.expect("semaphore acquire should not fail");
 
                 let Some(result) = token
-                    .run_until_cancelled(Self::init(
+                    .run_until_cancelled(Self::init_and_subscribe(
                         &node,
                         tx.clone(),
                         token.clone(),
                         allow_timed_reconnect.clone(),
+                        db,
                     ))
                     .await
                 else {
@@ -61,11 +62,10 @@ impl NodeConnection {
                 };
 
                 match result {
-                    Ok(device) => {
-                        tx.send(DeviceEvent::Status {
-                            event: DeviceStatusEvent::Connected { device },
-                        })
-                        .await
+                    Ok((device, notify)) => {
+                        tx.send_device_status(DeviceStatusEvent::Connected { device })
+                            .await;
+                        notify.notify_one();
                     }
                     Err(err) => {
                         tx.send_connection_stage(DeviceConnectionStage::Error(err.to_string()))
@@ -91,12 +91,13 @@ impl NodeConnection {
         self.allow_timed_reconnect.load(Ordering::Relaxed)
     }
 
-    async fn init(
+    async fn init_and_subscribe(
         node: &Node,
         tx: NodeSender,
         token: CancellationToken,
         allow_reconnect: Arc<AtomicBool>,
-    ) -> Result<Device, anyhow::Error> {
+        db: PersistDb,
+    ) -> Result<(Device, Arc<Notify>), anyhow::Error> {
         tx.send_connection_stage(DeviceConnectionStage::FetchingDeviceInfo)
             .await;
         let device = Device::from_node(&node).await?;
@@ -113,39 +114,50 @@ impl NodeConnection {
             .collect::<Vec<_>>();
 
         let event_paths = attr_ids
-            .map(|(endpoint, cluster, _)| EventPath::cluster(endpoint, cluster))
+            .map(|(endpoint, cluster, _)| matter_controller::EventPath::cluster(endpoint, cluster))
             .collect::<Vec<_>>();
 
         tx.send_connection_stage(DeviceConnectionStage::StartingListeners)
             .await;
 
-        let mut sub = node
-            .subscribe(
-                &read_paths,
-                &event_paths,
-                0,
-                5 * 60,
-            )
-            .await?;
+        let mut sub = node.subscribe(&read_paths, &event_paths, 0, 5 * 60).await?;
 
-        info!("subscription started on node {} with max report {}s", node.node_id(), sub.max_report_interval().as_secs());
+        let notify = Arc::new(tokio::sync::Notify::new());
 
         tokio::spawn({
             let node_id = node.node_id();
             let tx = tx.clone();
+
+            let notify = notify.clone();
             async move {
+                notify.notified().await;
+
                 let start = Instant::now();
+                let mut startup_event_block_passed = false;
+
 
                 loop {
                     let Some(Some(event)) = token.run_until_cancelled(sub.next()).await else {
                         break;
                     };
-                    info!("received event on node {}: {:?}", node_id, event);
 
                     match event {
                         matter_controller::SubscriptionEvent::Report(attribute_report) => {
-                            match Self::attr_change_from_report(&attribute_report) {
-                                Ok(event) => tx.send(DeviceEvent::AttrChange { event }).await,
+                            let (event, bytes) = Self::attr_change_from_report(&attribute_report);
+                            db.log_attribute_change(
+                                AttrPath {
+                                    device: node_id,
+                                    endpoint: attribute_report.path.endpoint,
+                                    cluster: attribute_report.path.cluster,
+                                    attribute: attribute_report.path.attribute,
+                                },
+                                bytes,
+                            )
+                            .await
+                            .unwrap();
+
+                            match event {
+                                Ok(event) => tx.send_attr_change(event).await,
                                 Err(_) => {}
                             }
                         }
@@ -155,23 +167,49 @@ impl NodeConnection {
                             // Directly after subsribing the device sends old events from past connections.
                             // When using automations, this leads to weird behaviour when buttons or other sensors get connected
                             // So we ignore all events sent at the start of the subscription
-                            if Instant::now().duration_since(start) < Duration::from_secs(2) {
-                                info!("IGNORED event at start of subscription");
-                                continue;
+                            if !startup_event_block_passed {
+                                if Instant::now().duration_since(start) < Duration::from_secs(2) {
+                                    info!("IGNORED event at start of subscription");
+                                    continue;
+                                } else {
+                                    startup_event_block_passed = true;
+                                }
                             }
-                            if let EventPath {
+
+                            let path = if let matter_controller::EventPath {
                                 endpoint: Some(endpoint),
                                 cluster: Some(cluster),
                                 event: Some(event),
                                 ..
                             } = report.path
-                                && let Some(event) =
-                                    ClusterEvent::from_event(cluster, event, &report.value)
                             {
-                                tx.send(DeviceEvent::Event {
-                                    event: ActionEvent { endpoint, event },
-                                })
-                                .await
+                                EventPath {
+                                    device: node_id,
+                                    endpoint,
+                                    cluster,
+                                    event,
+                                }
+                            } else {
+                                warn!(
+                                    "Event report on node {} does not have concrete path {:?}",
+                                    node_id, report.path
+                                );
+                                continue;
+                            };
+
+                            let (event, bytes) = Self::cluster_event_from_report(path, &report);
+
+                            db.log_event(path, bytes).await.unwrap();
+
+                            match event {
+                                Ok(event) => {
+                                    tx.send_action_event(ActionEvent {
+                                        endpoint: path.endpoint,
+                                        event,
+                                    })
+                                    .await
+                                }
+                                Err(_) => {}
                             }
                         }
                         matter_controller::SubscriptionEvent::Resubscribing { cause } => {
@@ -206,17 +244,41 @@ impl NodeConnection {
             }
         });
 
-        Ok(device)
+        Ok((device, notify))
     }
 
-    fn attr_change_from_report(report: &AttributeReport) -> anyhow::Result<AttrChangeEvent> {
-        let change =
-            AttrChange::from_attr(report.path.cluster, report.path.attribute, &report.value)?;
-        Ok(AttrChangeEvent {
-            endpoint: report.path.endpoint,
-            source: AttrChangeSource::Device,
-            change,
-        })
+    fn attr_change_from_report(
+        report: &AttributeReport,
+    ) -> (anyhow::Result<AttrChangeEvent>, Vec<u8>) {
+        let mut tlv_bytes = Vec::new();
+        let mut writer = matter_codec::TlvWriter::new(&mut tlv_bytes);
+        writer
+            .write_value(matter_codec::Tag::Anonymous, &report.value)
+            .expect("writing to vec should not fail");
+
+        let change = AttrChange::from_attr(report.path.cluster, report.path.attribute, &tlv_bytes)
+            .map(|change| AttrChangeEvent {
+                endpoint: report.path.endpoint,
+                source: AttrChangeSource::Device,
+                change,
+            });
+        (change, tlv_bytes)
+    }
+
+    fn cluster_event_from_report(
+        path: EventPath,
+        report: &EventReportItem,
+    ) -> (anyhow::Result<ClusterEvent>, Vec<u8>) {
+        let mut tlv_bytes = Vec::new();
+        let mut writer = matter_codec::TlvWriter::new(&mut tlv_bytes);
+        writer
+            .write_value(matter_codec::Tag::Anonymous, &report.value)
+            .expect("writing to vec should not fail");
+
+        let event = ClusterEvent::from_event(path.cluster, path.event, &tlv_bytes)
+            .ok_or_else(|| anyhow!("failed to create event"));
+
+        (event, tlv_bytes)
     }
 
     fn attr_ids_from_device(

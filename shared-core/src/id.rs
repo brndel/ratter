@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 pub type DeviceId = u64;
 pub type EndpointId = u16;
 pub type ClusterId = u32;
@@ -11,7 +13,7 @@ pub type ProductId = u16;
 
 
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct AttrPath {
     pub device: DeviceId,
     pub endpoint: EndpointId,
@@ -19,7 +21,7 @@ pub struct AttrPath {
     pub attribute: AttrId
 }
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct EventPath {
     pub device: DeviceId,
     pub endpoint: EndpointId,

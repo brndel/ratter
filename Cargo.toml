@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["app", "backend", "shared-core", "wobble-graph"]
+members = ["app", "backend", "persist", "shared-core", "wobble-graph"]
 
 default-members = ["app"]
 
@@ -9,6 +9,7 @@ app.path = "app"
 backend.path = "backend"
 shared-core.path = "shared-core"
 wobble-graph.path = "wobble-graph"
+persist.path = "persist"
 
 # matter-controller = { version = "0.14.0", features = ["ble"] }
 # matter-clusters = "0.5.0"
@@ -16,12 +17,12 @@ wobble-graph.path = "wobble-graph"
 # matter-commissioning = "0.10.0"
 # matter-codec = "0.3.1"
 
-matter-controller = { git = "https://github.com/brndel/matter-rust", rev = "6342c395fffea7edb36630a71f3877ed433ab164", features = ["ble"] }
-matter-clusters = { git = "https://github.com/brndel/matter-rust", rev = "6342c395fffea7edb36630a71f3877ed433ab164" }
-matter-interaction = { git = "https://github.com/brndel/matter-rust", rev = "6342c395fffea7edb36630a71f3877ed433ab164" }
-matter-commissioning = { git = "https://github.com/brndel/matter-rust", rev = "6342c395fffea7edb36630a71f3877ed433ab164" }
-matter-codec = { git = "https://github.com/brndel/matter-rust", rev = "6342c395fffea7edb36630a71f3877ed433ab164" }
-matter-bdx = { git = "https://github.com/brndel/matter-rust", rev = "6342c395fffea7edb36630a71f3877ed433ab164" }
+matter-controller = { git = "https://github.com/brndel/matter-rust", rev = "de950e4243464526d8930a3b5d31d5be40e7c3b5", features = ["ble"] }
+matter-clusters = { git = "https://github.com/brndel/matter-rust", rev = "de950e4243464526d8930a3b5d31d5be40e7c3b5", features = ["serde"]}
+matter-interaction = { git = "https://github.com/brndel/matter-rust", rev = "de950e4243464526d8930a3b5d31d5be40e7c3b5" }
+matter-commissioning = { git = "https://github.com/brndel/matter-rust", rev = "de950e4243464526d8930a3b5d31d5be40e7c3b5" }
+matter-codec = { git = "https://github.com/brndel/matter-rust", rev = "de950e4243464526d8930a3b5d31d5be40e7c3b5" }
+matter-bdx = { git = "https://github.com/brndel/matter-rust", rev = "de950e4243464526d8930a3b5d31d5be40e7c3b5" }
 
 
 # matter-controller = { path = "../matter-rust/crates/matter-controller", features = ["ble"] }
@@ -69,4 +70,5 @@ sha2 = "0.11"
 sha3 = "0.12"
 
 # backend
-toasty = { version = "0.10.0", default-features = false, features = ["sqlite", "serde", "jiff"] }
+toasty = { version = "0.10.0", default-features = false, features = ["migration", "sqlite", "serde", "jiff"] }
+toasty-cli.version = "0.10.0"

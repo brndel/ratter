@@ -6,6 +6,7 @@ use std::{collections::BTreeMap, sync::Arc};
 use dioxus::logger::tracing::{error, info};
 use futures::Stream;
 use matter_controller::{MatterController, Node};
+use persist::PersistDb;
 use shared_core::{
     attr_dump::{AttrDump, AttrDumpValue},
     backend::RunAction,
@@ -26,6 +27,7 @@ use anyhow::anyhow;
 #[derive(Clone)]
 pub struct NodeConnections {
     tx: Sender<NodeConnectionEvent>,
+    db: PersistDb,
     connections: Arc<RwLock<BTreeMap<u64, NodeConnection>>>,
     connection_semaphore: Arc<Semaphore>
 }
@@ -36,9 +38,10 @@ pub struct NodeConnectionEvent {
 }
 
 impl NodeConnections {
-    pub fn new(tx: Sender<NodeConnectionEvent>) -> Self {
+    pub fn new(tx: Sender<NodeConnectionEvent>, db: PersistDb) -> Self {
         Self {
             tx,
+            db,
             connections: Default::default(),
             connection_semaphore: Arc::new(Semaphore::new(4))
         }
@@ -63,6 +66,7 @@ impl NodeConnections {
                 &mut connections,
                 node,
                 &self.connection_semaphore,
+                &self.db,
                 force_reconnect,
             ) {
                 added_connections_counter += 1;
@@ -80,6 +84,7 @@ impl NodeConnections {
             &mut connections,
             node,
             &self.connection_semaphore,
+            &self.db,
             force_reconnect,
         )
     }
@@ -89,6 +94,7 @@ impl NodeConnections {
         connections: &mut BTreeMap<u64, NodeConnection>,
         node: Node,
         semaphore: &Arc<Semaphore>,
+        db: &PersistDb,
         force_reconnect: bool,
     ) -> bool {
         if force_reconnect
@@ -96,9 +102,9 @@ impl NodeConnections {
                 .get(&node.node_id())
                 .is_none_or(|connection: &NodeConnection| connection.allow_timed_reconnect())
         {
-            let sender = NodeSender::new(node.node_id(), tx.clone());
+            let sender = NodeSender::new(node.node_id(), tx.clone(), db.clone());
 
-            connections.insert(node.node_id(), NodeConnection::new(node, sender, semaphore.clone()));
+            connections.insert(node.node_id(), NodeConnection::new(node, sender, semaphore.clone(), db.clone()));
             true
         } else {
             false

@@ -1,10 +1,10 @@
-use serde::{Deserialize, Serialize};
+use matter_clusters::r#gen::electrical_power_measurement::PowerModeEnum;
 
 use crate::device::clusters::define_cluster_macro::define_cluster;
 
 define_cluster!(
     struct ElectricalPowerMeasurement, enum ElectricalPowerMeasurementChange, electrical_power_measurement {
-        power_mode: ElectricalPowerMode => POWER_MODE as SetPowerMode { decode_power_mode },
+        power_mode: PowerModeEnum => POWER_MODE as SetPowerMode { decode_power_mode },
         voltage: Option<i64> => VOLTAGE "listen" as SetVoltage { decode_voltage => matter_clusters::types::Nullable::value },
         active_current: Option<i64> => ACTIVE_CURRENT "listen" as SetActiveCurrent { decode_active_current => matter_clusters::types::Nullable::value },
         // reactive_current: Option<i64> => REACTIVE_CURRENT as SetReactiveCurrent { decode_reactive_current => matter_clusters::types::Nullable::value },
@@ -19,27 +19,3 @@ define_cluster!(
         // power_factor: Option<i64> => POWER_FACTOR as SetPowerFactor { decode_power_factor => matter_clusters::types::Nullable::value }
     }
 );
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-pub enum ElectricalPowerMode {
-    Ac,
-    Dc,
-    Unkown,
-}
-
-#[cfg(feature = "backend")]
-mod backend_impl_2 {
-    use super::*;
-use matter_clusters::r#gen::electrical_power_measurement::PowerModeEnum;
-
-    impl From<PowerModeEnum> for ElectricalPowerMode {
-        fn from(value: PowerModeEnum) -> Self {
-            match value {
-                PowerModeEnum::Unknown => Self::Unkown,
-                PowerModeEnum::Dc => Self::Dc,
-                PowerModeEnum::Ac => Self::Ac,
-                PowerModeEnum::Unrecognized(_) => Self::Unkown,
-            }
-        }
-    }
-}

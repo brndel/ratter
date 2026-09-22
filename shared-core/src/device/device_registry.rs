@@ -5,7 +5,6 @@ use dioxus::{
     signals::WriteSignal,
 };
 use dioxus_stores::Store;
-use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -20,7 +19,6 @@ pub struct DeviceRegistry {
 #[derive(Debug, Clone, Serialize, Deserialize, Store)]
 pub enum DeviceInitStatus {
     Connecting {
-        timestamp: Timestamp,
         stage: DeviceConnectionStage,
     },
     Connected {
@@ -53,9 +51,9 @@ impl DeviceRegistry {
     pub fn handle_event(&mut self, device_id: u64, event: DeviceEvent) {
         match event {
             DeviceEvent::Status { event } => match event {
-                DeviceStatusEvent::Connecting { timestamp, stage } => {
+                DeviceStatusEvent::Connecting { stage } => {
                     self.devices
-                        .insert(device_id, DeviceInitStatus::Connecting { timestamp, stage });
+                        .insert(device_id, DeviceInitStatus::Connecting { stage });
                 }
                 DeviceStatusEvent::Connected { device } => {
                     self.devices.insert(

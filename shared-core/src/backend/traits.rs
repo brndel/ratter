@@ -1,5 +1,4 @@
 
-use matter_codec::Value;
 use matter_controller::Node;
 
 use crate::{
@@ -19,7 +18,7 @@ pub trait FromEndpoint: Sized {
 }
 
 pub trait FromAttr: Sized {
-    fn from_attr(cluster: u32, attr: u32, value: &Value) -> anyhow::Result<Self>;
+    fn from_attr(cluster: u32, attr: u32, value: &[u8]) -> anyhow::Result<Self>;
 }
 
 pub trait ClusterState {
@@ -30,7 +29,7 @@ pub trait FromAttrChange: Sized + ChangeEvent
 where
     <Self as ChangeEvent>::State: ClusterState,
 {
-    fn from_attr_change(attr: u32, value: &Value) -> anyhow::Result<Self>;
+    fn from_attr_change(attr: u32, value_tlv: &[u8]) -> anyhow::Result<Self>;
 }
 
 pub trait RunAction<Target, Action> {

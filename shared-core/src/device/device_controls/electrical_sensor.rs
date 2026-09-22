@@ -29,9 +29,12 @@ impl<'a> From<ElectricalSensorParamsClusters<'a>> for ElectricalSensorParams {
         Self {
             voltage: value.power_measurement.voltage.unwrap_or_default(),
             active_power: value.power_measurement.active_power.unwrap_or_default(),
-            total_energy_imported: value.energy_measurement.cumulative_energy_imported
-                .energy
-                .unwrap_or_default(),
+            total_energy_imported: value
+                .energy_measurement
+                .cumulative_energy_imported
+                .clone()
+                .value()
+                .map_or_else(Default::default, |energy| energy.energy),
         }
     }
 }

@@ -94,16 +94,13 @@ mod backend_impl {
     }
 
     impl crate::backend::FromAttrChange for super::$enum_name {
-        fn from_attr_change(attr: u32, value: &matter_codec::Value) -> anyhow::Result<Self> {
-            let mut tlv_bytes = Vec::new();
-            let mut writer = matter_codec::TlvWriter::new(&mut tlv_bytes);
-            writer.write_value(matter_codec::Tag::Anonymous, &value).expect("writing to vec should not fail");
+        fn from_attr_change(attr: u32, value_tlv: &[u8]) -> anyhow::Result<Self> {
 
             let value = match attr {
                 $(
                     matter_clusters::r#gen::$cluster::attribute_id::$attr_id => Self::$field_enum_variant {
                         $field_name: {
-                            let value = matter_clusters::r#gen::$cluster::$decode_fn(&tlv_bytes)?;
+                            let value = matter_clusters::r#gen::$cluster::$decode_fn(value_tlv)?;
                             crate::device::clusters::define_cluster_macro::transform_field!(value $(=> $transform)?)
                         }
                     }

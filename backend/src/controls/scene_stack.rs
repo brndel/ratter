@@ -15,7 +15,7 @@ use shared_core::{
 };
 
 use crate::{
-    controls::scene_stack_entry::SceneStackEntry, event_bus::EventBusSender, read_only::ReadOnlyArc,
+    controls::scene_stack_entry::SceneStackEntry, event_bus::EventBusSender, read_only_arc::ReadOnlyArc,
 };
 
 pub struct SceneStack {

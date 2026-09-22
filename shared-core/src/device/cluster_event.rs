@@ -20,26 +20,19 @@ mod backend_impl {
 
     use crate::id::{ClusterId, EventId};
     use matter_clusters::r#gen::switch;
-    use matter_codec::Value;
 
     impl ClusterEvent {
-        pub fn from_event(cluster: ClusterId, event_id: EventId, value: &Value) -> Option<Self> {
+        pub fn from_event(cluster: ClusterId, event_id: EventId, value_tlv: &[u8]) -> Option<Self> {
             match cluster {
                 switch::CLUSTER_ID => {
-                    ButtonClusterEvent::from_event(event_id, value).map(Self::from)
+                    ButtonClusterEvent::from_event(event_id, value_tlv).map(Self::from)
                 }
                 _ => None,
             }
         }
     }
     impl ButtonClusterEvent {
-        pub fn from_event(event_id: EventId, value: &Value) -> Option<Self> {
-            let mut tlv_bytes = Vec::new();
-            let mut writer = matter_codec::TlvWriter::new(&mut tlv_bytes);
-            writer
-                .write_value(matter_codec::Tag::Anonymous, &value)
-                .expect("writing to vec should not fail");
-
+        pub fn from_event(event_id: EventId, value_tlv: &[u8]) -> Option<Self> {
             match event_id {
                 switch::event_id::SHORT_RELEASE => {
                     // let _event = switch::ShortReleaseEvent::decode(&tlv_bytes).ok()?;
@@ -51,19 +44,19 @@ mod backend_impl {
                     None
                 }
                 switch::event_id::MULTI_PRESS_COMPLETE => {
-                    let event = switch::MultiPressCompleteEvent::decode(&tlv_bytes).ok()?;
+                    let event = switch::MultiPressCompleteEvent::decode(&value_tlv).ok()?;
 
                     Some(Self::Press {
                         count: event.total_number_of_presses_counted,
                     })
                 }
                 switch::event_id::LONG_PRESS => {
-                    let _event = switch::LongPressEvent::decode(&tlv_bytes).ok()?;
+                    let _event = switch::LongPressEvent::decode(&value_tlv).ok()?;
 
                     Some(Self::LongPressStarted)
                 }
                 switch::event_id::LONG_RELEASE => {
-                    let _event = switch::LongReleaseEvent::decode(&tlv_bytes).ok()?;
+                    let _event = switch::LongReleaseEvent::decode(&value_tlv).ok()?;
 
                     Some(Self::LongPressEnded)
                 }

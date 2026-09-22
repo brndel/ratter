@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 shared-core = { workspace = true, features = ["backend"] }
+persist.workspace = true
 
 dioxus = { workspace = true, features = ["server"] }
 dioxus-html.workspace = true
@@ -20,8 +21,6 @@ matter-codec.workspace = true
 matter-clusters.workspace = true
 matter-interaction.workspace = true
 matter-commissioning = { workspace = true }
-
-toasty.workspace = true
 
 notify.workspace = true
 tokio.workspace = true

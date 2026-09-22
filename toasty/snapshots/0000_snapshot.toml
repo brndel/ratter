@@ -1,0 +1,170 @@
+version = 1
+
+[schema]
+
+[[schema.tables]]
+id = 0
+name = "attribute_changes"
+primary_key = { columns = [{ table = 0, index = 0 }, { table = 0, index = 1 }], index = { table = 0, index = 0 } }
+
+[[schema.tables.columns]]
+id = { table = 0, index = 0 }
+name = "attribute_id"
+ty = "Bytes"
+storage_ty = "Blob"
+
+[[schema.tables.columns]]
+id = { table = 0, index = 1 }
+name = "timestamp"
+ty = "String"
+storage_ty = "Text"
+
+[[schema.tables.columns]]
+id = { table = 0, index = 2 }
+name = "value"
+ty = "Bytes"
+storage_ty = "Blob"
+
+[[schema.tables.indices]]
+id = { table = 0, index = 0 }
+name = "index_attribute_changes_by_attribute_id_and_timestamp"
+on = 0
+columns = [{ column = { table = 0, index = 0 }, op = "Eq", scope = "Partition" }, { column = { table = 0, index = 1 }, op = "Eq", scope = "Local" }]
+unique = true
+primary_key = true
+
+[[schema.tables.indices]]
+id = { table = 0, index = 1 }
+name = "index_attribute_changes_by_timestamp"
+on = 0
+columns = [{ column = { table = 0, index = 1 }, op = "Eq", scope = "Partition" }]
+
+[[schema.tables]]
+id = 1
+name = "cluster_item_ids"
+primary_key = { columns = [{ table = 1, index = 0 }], index = { table = 1, index = 0 } }
+
+[[schema.tables.columns]]
+id = { table = 1, index = 0 }
+name = "id"
+ty = "Bytes"
+storage_ty = "Blob"
+
+[[schema.tables.columns]]
+id = { table = 1, index = 1 }
+name = "item_device"
+ty = "U64"
+storage_ty = { UnsignedInteger = 8 }
+
+[[schema.tables.columns]]
+id = { table = 1, index = 2 }
+name = "item_endpoint"
+ty = "U16"
+storage_ty = { UnsignedInteger = 2 }
+
+[[schema.tables.columns]]
+id = { table = 1, index = 3 }
+name = "item_cluster"
+ty = "U32"
+storage_ty = { UnsignedInteger = 4 }
+
+[[schema.tables.columns]]
+id = { table = 1, index = 4 }
+name = "item_item"
+ty = "U32"
+storage_ty = { UnsignedInteger = 4 }
+
+[[schema.tables.columns]]
+id = { table = 1, index = 5 }
+name = "item_item_is_attr"
+ty = "Bool"
+storage_ty = "Boolean"
+
+[[schema.tables.indices]]
+id = { table = 1, index = 0 }
+name = "index_cluster_item_ids_by_id"
+on = 1
+columns = [{ column = { table = 1, index = 0 }, op = "Eq", scope = "Partition" }]
+unique = true
+primary_key = true
+
+[[schema.tables.indices]]
+id = { table = 1, index = 1 }
+name = "index_cluster_item_ids_by_item_device_and_item_endpoint_and_item_cluster_and_item_item_and_item_item_is_attr"
+on = 1
+columns = [{ column = { table = 1, index = 1 }, op = "Eq", scope = "Partition" }, { column = { table = 1, index = 2 }, op = "Eq", scope = "Local" }, { column = { table = 1, index = 3 }, op = "Eq", scope = "Local" }, { column = { table = 1, index = 4 }, op = "Eq", scope = "Local" }, { column = { table = 1, index = 5 }, op = "Eq", scope = "Local" }]
+unique = true
+
+[[schema.tables]]
+id = 2
+name = "device_status_logs"
+primary_key = { columns = [{ table = 2, index = 0 }, { table = 2, index = 1 }], index = { table = 2, index = 0 } }
+
+[[schema.tables.columns]]
+id = { table = 2, index = 0 }
+name = "device_id"
+ty = "U64"
+storage_ty = { UnsignedInteger = 8 }
+
+[[schema.tables.columns]]
+id = { table = 2, index = 1 }
+name = "timestamp"
+ty = "String"
+storage_ty = "Text"
+
+[[schema.tables.columns]]
+id = { table = 2, index = 2 }
+name = "status"
+ty = "String"
+storage_ty = "Text"
+
+[[schema.tables.indices]]
+id = { table = 2, index = 0 }
+name = "index_device_status_logs_by_device_id_and_timestamp"
+on = 2
+columns = [{ column = { table = 2, index = 0 }, op = "Eq", scope = "Partition" }, { column = { table = 2, index = 1 }, op = "Eq", scope = "Local" }]
+unique = true
+primary_key = true
+
+[[schema.tables.indices]]
+id = { table = 2, index = 1 }
+name = "index_device_status_logs_by_timestamp"
+on = 2
+columns = [{ column = { table = 2, index = 1 }, op = "Eq", scope = "Partition" }]
+
+[[schema.tables]]
+id = 3
+name = "event_logs"
+primary_key = { columns = [{ table = 3, index = 0 }, { table = 3, index = 1 }], index = { table = 3, index = 0 } }
+
+[[schema.tables.columns]]
+id = { table = 3, index = 0 }
+name = "event_id"
+ty = "Bytes"
+storage_ty = "Blob"
+
+[[schema.tables.columns]]
+id = { table = 3, index = 1 }
+name = "timestamp"
+ty = "String"
+storage_ty = "Text"
+
+[[schema.tables.columns]]
+id = { table = 3, index = 2 }
+name = "value"
+ty = "Bytes"
+storage_ty = "Blob"
+
+[[schema.tables.indices]]
+id = { table = 3, index = 0 }
+name = "index_event_logs_by_event_id_and_timestamp"
+on = 3
+columns = [{ column = { table = 3, index = 0 }, op = "Eq", scope = "Partition" }, { column = { table = 3, index = 1 }, op = "Eq", scope = "Local" }]
+unique = true
+primary_key = true
+
+[[schema.tables.indices]]
+id = { table = 3, index = 1 }
+name = "index_event_logs_by_timestamp"
+on = 3
+columns = [{ column = { table = 3, index = 1 }, op = "Eq", scope = "Partition" }]

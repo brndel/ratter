@@ -36,7 +36,6 @@ pub enum Event {
 #[derive(Debug, Clone, Serialize, Deserialize, derive_more::From)]
 pub enum DeviceStatusEvent {
     Connecting {
-        timestamp: Timestamp,
         stage: DeviceConnectionStage,
     },
     Connected {
@@ -58,7 +57,6 @@ impl DeviceEvent {
     pub fn connecting(stage: DeviceConnectionStage) -> Self {
         Self::Status {
             event: DeviceStatusEvent::Connecting {
-                timestamp: Timestamp::now(),
                 stage,
             },
         }

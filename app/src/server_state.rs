@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::fmt::Display;
 
-use dioxus::fullstack::{Cbor, ServerEvents};
+use dioxus::fullstack::ServerEvents;
 use dioxus::prelude::*;
 use futures::StreamExt;
 use shared_core::asset::asset_registry::AssetRegistry;

@@ -1,0 +1,25 @@
+[package]
+name = "persist"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+toasty.workspace = true
+shared-core = { workspace = true, features = ["backend"] }
+tokio.workspace = true
+thiserror.workspace = true
+jiff.workspace = true
+serde.workspace = true
+toasty-cli = { workspace = true, optional = true }
+
+[features]
+cli = ["dep:toasty-cli"]
+
+[dev-dependencies]
+matter-clusters.workspace = true
+
+
+[[bin]]
+name = "cli"
+path = "bin/cli.rs"
+required-features = ["cli"]

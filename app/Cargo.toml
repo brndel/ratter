@@ -18,6 +18,7 @@ futures.workspace = true
 derive_more.workspace = true
 
 shared-core.workspace = true
+matter-clusters.workspace = true
 wobble-graph = { workspace = true }
 backend = { workspace = true, optional = true }
 

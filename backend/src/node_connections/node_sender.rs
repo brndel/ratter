@@ -1,7 +1,7 @@
-use jiff::Timestamp;
+use persist::PersistDb;
 use shared_core::{
     device::device_registry::{DeviceConnectionStage, DeviceSubscriptionStatus},
-    event::{DeviceEvent, DeviceStatusEvent},
+    event::{ActionEvent, AttrChangeEvent, DeviceEvent, DeviceStatusEvent},
     id::DeviceId,
 };
 use tokio::sync::mpsc::Sender;
@@ -12,37 +12,54 @@ use crate::node_connections::NodeConnectionEvent;
 pub struct NodeSender {
     node_id: DeviceId,
     tx: Sender<NodeConnectionEvent>,
+    db: PersistDb,
 }
 
 impl NodeSender {
-    pub fn new(node_id: DeviceId, tx: Sender<NodeConnectionEvent>) -> Self {
-        Self { node_id, tx }
+    pub fn new(node_id: DeviceId, tx: Sender<NodeConnectionEvent>, db: PersistDb) -> Self {
+        Self { node_id, tx, db }
     }
 
-    pub async fn send(&self, event: DeviceEvent) {
-        let _ = self
-            .tx
+    pub async fn send_attr_change(&self, event: AttrChangeEvent) {
+        self.tx
             .send(NodeConnectionEvent {
                 node_id: self.node_id,
-                event,
+                event: DeviceEvent::AttrChange { event },
             })
-            .await;
+            .await
+            .unwrap();
+    }
+
+    pub async fn send_action_event(&self, event: ActionEvent) {
+        self.tx
+            .send(NodeConnectionEvent {
+                node_id: self.node_id,
+                event: DeviceEvent::Event { event },
+            })
+            .await
+            .unwrap();
+    }
+
+    pub async fn send_device_status(&self, event: DeviceStatusEvent) {
+        self.db.log_device_status(self.node_id, &event).await.unwrap();
+        
+        self.tx
+            .send(NodeConnectionEvent {
+                node_id: self.node_id,
+                event: DeviceEvent::Status { event: event.clone() },
+            })
+            .await
+            .unwrap();
+
     }
 
     pub async fn send_connection_stage(&self, stage: DeviceConnectionStage) {
-        self.send(DeviceEvent::Status {
-            event: DeviceStatusEvent::Connecting {
-                timestamp: Timestamp::now(),
-                stage,
-            },
-        })
-        .await
+        self.send_device_status(DeviceStatusEvent::Connecting { stage })
+            .await;
     }
 
     pub async fn send_subsription_status(&self, status: DeviceSubscriptionStatus) {
-        self.send(DeviceEvent::Status {
-            event: DeviceStatusEvent::SubscriptionStatus { status },
-        })
-        .await
+        self.send_device_status(DeviceStatusEvent::SubscriptionStatus { status })
+            .await;
     }
 }

@@ -5,12 +5,12 @@ mod light_control;
 mod page;
 mod server_state;
 mod device_details_ota;
+mod attr_change_history;
 
 use jiff::{Zoned, tz::TimeZone};
 use page::*;
 use shared_core::{
-    asset::{device::DeviceAsset, label::Label, room::Room},
-    device::{
+    asset::{device::DeviceAsset, label::Label, room::Room}, device::{
         clusters::IdentifyAction,
         device_controls::{
             ElectricalSensorParams, ElectricalSensorParamsClusters, HumiditySensorParams,
@@ -19,7 +19,7 @@ use shared_core::{
             TemperatureSensorParams, TemperatureSensorParamsClusters,
         },
         device_registry::{DeviceConnectionStage, DeviceSubscriptionStatus},
-    },
+    }, id::AttrPath,
 };
 
 use dioxus::prelude::*;
@@ -41,7 +41,7 @@ use shared_core::{
 };
 
 use crate::{
-    attr_dump::AttrDumpView, cluster_display::{
+    attr_change_history::AttrChangeHistoryView, attr_dump::AttrDumpView, cluster_display::{
         electrical_sensor::display_electrical_sensor, humidity_sensor::display_humidity_sensor,
         occupancy_sensor::display_occupancy_sensor, power_source::display_power_source,
         switch::display_switch, temperature_sensor::display_temperature_sensor,
@@ -185,7 +185,7 @@ fn DeviceListEntry(device_id: u64, device: Store<DeviceInitStatus>) -> Element {
 
     let mut connection_status_details = None;
     let connection_status = match &*(device.read()) {
-        DeviceInitStatus::Connecting { timestamp, stage } => Some({
+        DeviceInitStatus::Connecting { stage } => Some({
             let status = match stage {
                 DeviceConnectionStage::Queued => "queued".to_owned(),
                 DeviceConnectionStage::StartingListeners => "start listeners".to_owned(),
@@ -197,9 +197,8 @@ fn DeviceListEntry(device_id: u64, device: Store<DeviceInitStatus>) -> Element {
             };
 
             connection_status_details = Some(format!(
-                "Connecting...\n last update: {} at {}\n{}",
+                "Connecting...\n last update: {}\n{}",
                 status,
-                Zoned::new(*timestamp, TimeZone::system()).strftime("%H:%M:%S"),
                 connection_status_details.unwrap_or_default()
             ));
 
@@ -222,13 +221,12 @@ fn DeviceListEntry(device_id: u64, device: Store<DeviceInitStatus>) -> Element {
                 Some(format!("lagged (dropped {})", dropped_events))
             }
             Some(DeviceSubscriptionStatus::Closed) => Some("closed".to_string()),
-            None => None,
+            None => Some("waiting for subscription status".to_string()),
         },
     };
 
     let connection_class = match &*(device.read()) {
         DeviceInitStatus::Connecting {
-            timestamp: _,
             stage,
         } => match stage {
             DeviceConnectionStage::Queued { .. } => "waiting",
@@ -576,6 +574,19 @@ fn DeviceTypeView(
             let display = display_electrical_sensor(params);
             rsx! {
                 {display}
+                DialogRoot {
+                    DialogButton { "view ActivePower history" }
+                    DialogContent { title: "Value history",
+                        AttrChangeHistoryView {
+                            path: AttrPath {
+                                device: device_id,
+                                endpoint: endpoint_id,
+                                cluster: 0x0090,
+                                attribute: 0x0008,
+                            },
+                        }
+                    }
+                }
             }
         }
         0x0011 if let Some(params) = power_source() => {

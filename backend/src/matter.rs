@@ -4,11 +4,12 @@ use anyhow::{Result, anyhow};
 use dioxus::logger::tracing::info;
 use futures::Stream;
 
-use jiff::Timestamp;
+use jiff::{Timestamp, Zoned, tz::TimeZone};
 use matter_controller::{
     AttestationTrust, FabricConfig, FileStore, MatterController, MatterTime, OpenWindowOpts,
     ThreadDataset,
 };
+use persist::PersistDb;
 use tokio::{
     fs,
     sync::{
@@ -30,7 +31,8 @@ use shared_core::{
         DeviceCommissionMode, EndpointAction, EndpointTarget, device_controls::LightControl,
         device_registry::DeviceRegistry,
     },
-    id::{AssetId, DeviceId},
+    event::{AttrChangeEvent, AttrChangeSource, DeviceEvent},
+    id::{AssetId, AttrPath, DeviceId, EventPath},
     ota::{OtaManagerClient, OtaProductId},
     thread::{ThreadGraphMessage, ThreadGraphMessageKind},
 };
@@ -42,7 +44,7 @@ use crate::{
     event_bus::{EventBus, EventBusListener},
     node_connections::NodeConnections,
     ota::OtaManager,
-    read_only::ReadOnlyArc,
+    read_only_arc::ReadOnlyArc,
     thread::{read_otbr_address_map, read_thread_data},
 };
 
@@ -58,7 +60,7 @@ struct MatterManagerInner {
     controls: Arc<RwLock<Controls>>,
     event_bus: EventBus,
     connections: NodeConnections,
-    // db: PersistDb,
+    db: PersistDb,
     thread_dataset: RwLock<Option<Vec<u8>>>,
     ota_manager: Arc<RwLock<OtaManager>>,
 }
@@ -226,8 +228,37 @@ impl MatterManager {
     }
 
     pub async fn remove_fabric(&self, device: DeviceId, fabric_index: u8) -> anyhow::Result<()> {
-        self.0.controller.node(device).remove_fabric(fabric_index).await?;
+        self.0
+            .controller
+            .node(device)
+            .remove_fabric(fabric_index)
+            .await?;
         Ok(())
+    }
+}
+
+impl MatterManager {
+    pub async fn query_attribute_changes(
+        &self,
+        path: AttrPath,
+    ) -> anyhow::Result<Vec<(Timestamp, Vec<u8>)>> {
+        let date = Zoned::now();
+        let start = date.start_of_day()?.timestamp();
+        let end = date.end_of_day()?.timestamp();
+
+        let changes = self.0.db.query_attribute_changes(path, start, end).await?;
+
+        Ok(changes)
+    }
+
+    pub async fn query_events(&self, path: EventPath) -> anyhow::Result<Vec<(Timestamp, Vec<u8>)>> {
+        let date = Zoned::now();
+        let start = date.start_of_day()?.timestamp();
+        let end = date.end_of_day()?.timestamp();
+
+        let changes = self.0.db.query_events(path, start, end).await?;
+
+        Ok(changes)
     }
 }
 
@@ -273,7 +304,9 @@ impl MatterManager {
 
         let result = timeout(
             Duration::from_mins(20),
-            self.0.controller.serve_ota_with_block_size(device, image, version, 5560, 256),
+            self.0
+                .controller
+                .serve_ota_with_block_size(device, image, version, 5560, 256),
         )
         .await;
         info!("SERVE_OTA is done: {result:?}");
@@ -292,11 +325,13 @@ impl MatterManagerInner {
         let device_registry = Arc::new(RwLock::new(DeviceRegistry::new()));
         let asset_registry = Arc::new(RwLock::new(AssetRegistry::new()));
 
+        let db = PersistDb::new("data/database.sqlite").await?;
+
         let connections = {
             let bus_sender = event_bus.sender();
 
             let (tx, mut rx) = channel(32);
-            let connections = NodeConnections::new(tx);
+            let connections = NodeConnections::new(tx, db.clone());
 
             tokio::spawn(async move {
                 while let Some(ev) = rx.recv().await {
@@ -342,7 +377,7 @@ impl MatterManagerInner {
                         .unwrap()
                         .into_iter()
                         .map(|info| info.node_id);
-                    // let nodes = [2, 9, 39, 45, 43].iter().cloned();
+                    // let nodes = [2, 4, 9, 39, 45, 43].iter().cloned();
 
                     let total_nodes_count = nodes.len();
 
@@ -370,8 +405,6 @@ impl MatterManagerInner {
         let ota_manager = OtaManager::new(event_bus.client_sender()).await;
         let ota_manager = Arc::new(RwLock::new(ota_manager));
 
-        // let db = PersistDb::new().await?;
-
         Ok(Self {
             controller: device_manager,
             device_registry,
@@ -380,7 +413,7 @@ impl MatterManagerInner {
             controls: device_controls,
             event_bus,
             connections,
-            // db,
+            db,
             thread_dataset,
             ota_manager,
         })
@@ -390,7 +423,7 @@ impl MatterManagerInner {
         tokio::fs::create_dir_all("./data").await?;
 
         let controller =
-            MatterController::builder(Arc::new(FileStore::new("./data/matter_controller.bin")))
+            MatterController::builder(Arc::new(FileStore::new("data/matter_controller.bin")))
                 .attestation_trust(AttestationTrust::from_dirs(
                     "certs/paa-root-certs".as_ref(),
                     "certs/cd-certs".as_ref(),

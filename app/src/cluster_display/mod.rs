@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 
 pub mod electrical_sensor;
-mod format;
+pub mod format;
 pub mod power_source;
 pub mod occupancy_sensor;
 pub mod switch;

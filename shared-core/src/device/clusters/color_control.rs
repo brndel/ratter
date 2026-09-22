@@ -112,7 +112,6 @@ impl ChangeEvent for ColorControlChange {
 #[cfg(feature = "backend")]
 mod backend_impl_2 {
     use matter_clusters::r#gen::color_control::ColorCapabilitiesBitmap;
-    use matter_codec::Value;
     use matter_controller::Node;
 
     use crate::
@@ -205,13 +204,7 @@ mod backend_impl_2 {
     // }
 
     impl crate::backend::FromAttrChange for super::ColorControlChange {
-        fn from_attr_change(attr: u32, value: &Value) -> anyhow::Result<Self> {
-            let mut tlv_bytes = Vec::new();
-            let mut writer = matter_codec::TlvWriter::new(&mut tlv_bytes);
-            writer
-                .write_value(matter_codec::Tag::Anonymous, &value)
-                .expect("writing to vec should not fail");
-
+        fn from_attr_change(attr: u32, value: &[u8]) -> anyhow::Result<Self> {
             ColorControlFeatureTemperatureChange::from_attr_change(attr, value)
                 .map(Into::into)
                 .or_else(|_| {

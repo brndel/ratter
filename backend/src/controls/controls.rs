@@ -19,7 +19,7 @@ use tokio::spawn;
 
 use crate::{
     node_connections::NodeConnections, controls::SceneStack, event_bus::EventBusSender,
-    read_only::ReadOnlyArc,
+    read_only_arc::ReadOnlyArc,
 };
 
 pub struct Controls {
