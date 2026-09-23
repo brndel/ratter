@@ -4,7 +4,7 @@ use anyhow::{Result, anyhow};
 use dioxus::logger::tracing::info;
 use futures::Stream;
 
-use jiff::{Timestamp, Zoned, tz::TimeZone};
+use jiff::{Timestamp, Zoned};
 use matter_controller::{
     AttestationTrust, FabricConfig, FileStore, MatterController, MatterTime, OpenWindowOpts,
     ThreadDataset,
@@ -31,7 +31,6 @@ use shared_core::{
         DeviceCommissionMode, EndpointAction, EndpointTarget, device_controls::LightControl,
         device_registry::DeviceRegistry,
     },
-    event::{AttrChangeEvent, AttrChangeSource, DeviceEvent},
     id::{AssetId, AttrPath, DeviceId, EventPath},
     ota::{OtaManagerClient, OtaProductId},
     thread::{ThreadGraphMessage, ThreadGraphMessageKind},

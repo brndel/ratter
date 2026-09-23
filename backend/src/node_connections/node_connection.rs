@@ -17,7 +17,7 @@ use shared_core::{
     event::{ActionEvent, AttrChangeEvent, AttrChangeSource, DeviceStatusEvent},
     id::{AttrId, AttrPath, ClusterId, EndpointId, EventPath},
 };
-use tokio::{sync::{Barrier, Notify, Semaphore}, time::Instant};
+use tokio::{sync::{Notify, Semaphore}, time::Instant};
 use tokio_util::sync::{CancellationToken, DropGuard};
 
 use crate::node_connections::node_sender::NodeSender;
@@ -218,7 +218,7 @@ impl NodeConnection {
                             })
                             .await;
                         }
-                        matter_controller::SubscriptionEvent::Established { subscription_id } => {
+                        matter_controller::SubscriptionEvent::Established { subscription_id, .. } => {
                             tx.send_subsription_status(DeviceSubscriptionStatus::Established {
                                 subscription_id,
                             })

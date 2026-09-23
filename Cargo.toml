@@ -17,12 +17,11 @@ persist.path = "persist"
 # matter-commissioning = "0.10.0"
 # matter-codec = "0.3.1"
 
-matter-controller = { git = "https://github.com/brndel/matter-rust", rev = "de950e4243464526d8930a3b5d31d5be40e7c3b5", features = ["ble"] }
-matter-clusters = { git = "https://github.com/brndel/matter-rust", rev = "de950e4243464526d8930a3b5d31d5be40e7c3b5", features = ["serde"]}
-matter-interaction = { git = "https://github.com/brndel/matter-rust", rev = "de950e4243464526d8930a3b5d31d5be40e7c3b5" }
-matter-commissioning = { git = "https://github.com/brndel/matter-rust", rev = "de950e4243464526d8930a3b5d31d5be40e7c3b5" }
-matter-codec = { git = "https://github.com/brndel/matter-rust", rev = "de950e4243464526d8930a3b5d31d5be40e7c3b5" }
-matter-bdx = { git = "https://github.com/brndel/matter-rust", rev = "de950e4243464526d8930a3b5d31d5be40e7c3b5" }
+matter-controller = { git = "https://github.com/brndel/matter-rust", rev = "ae1e577f6d552a0ba1f7774dd1032bc23cdd47d2", features = ["ble"] }
+matter-clusters = { git = "https://github.com/brndel/matter-rust", rev = "ae1e577f6d552a0ba1f7774dd1032bc23cdd47d2", features = ["serde"]}
+matter-interaction = { git = "https://github.com/brndel/matter-rust", rev = "ae1e577f6d552a0ba1f7774dd1032bc23cdd47d2" }
+matter-commissioning = { git = "https://github.com/brndel/matter-rust", rev = "ae1e577f6d552a0ba1f7774dd1032bc23cdd47d2" }
+matter-codec = { git = "https://github.com/brndel/matter-rust", rev = "ae1e577f6d552a0ba1f7774dd1032bc23cdd47d2" }
 
 
 # matter-controller = { path = "../matter-rust/crates/matter-controller", features = ["ble"] }
