@@ -17,7 +17,7 @@ in
   cargoLock = {
     lockFile = ./Cargo.lock;
     outputHashes = {
-      "matter-bdx-0.3.1" = "sha256-eh9jSSV+LaiwY3vcGIUSciG3zEIUdN6A+WsN78c4e1w=";
+      "matter-bdx-0.3.1" = "sha256-DcwacsnoOvuNakjPkxAHW/duv9cc5qtcoLo1+LLfCGQ=";
     };
   };
 
