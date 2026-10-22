@@ -192,11 +192,6 @@ input {
     }
 }
 
-.device-card {
-    background-color: #1e222d;
-    padding: 8pt;
-    border-radius: 8pt;
-}
 
 .endpoint-list {
     display: flex;
@@ -440,24 +435,6 @@ button.on-off-button {
 
 }
 
-.h-list {
-    display: flex;
-    flex-direction: row;
-    gap: 4pt;
-}
-
-.v-list {
-    display: flex;
-    flex-direction: column;
-    gap: 4pt;
-}
-
-.card {
-    border-radius: 6pt;
-    background-color: #30353f;
-}
-
-
 .color-label {
     display: flex;
     align-items: center;
@@ -509,12 +486,6 @@ button.on-off-button {
 
 }
 
-
-.spacer {
-    flex: 1;
-}
-
-
 .scene-layer-list {
     display: flex;
     flex-direction: column;
@@ -553,23 +524,4 @@ button.on-off-button {
             }
         }
     }
-}
-
-
-.loading-spinner {
-    width: 32pt;
-    height: 32pt;
-    border-radius: 50%;
-    border: 4pt dotted wheat;
-    /*border-style: solid dotted dotted dotted;*/
-    animation: rotation 2s ease-in-out infinite;
-}
-
-@keyframes rotation {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
 }

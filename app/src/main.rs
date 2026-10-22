@@ -7,7 +7,7 @@ mod server_state;
 mod device_details_ota;
 mod attr_change_history;
 
-use jiff::{Zoned, tz::TimeZone};
+use dioxus_free_icons::{Icon, icons::fa_solid_icons::FaPen};
 use page::*;
 use shared_core::{
     asset::{device::DeviceAsset, label::Label, room::Room}, device::{
@@ -46,9 +46,7 @@ use crate::{
         occupancy_sensor::display_occupancy_sensor, power_source::display_power_source,
         switch::display_switch, temperature_sensor::display_temperature_sensor,
     }, component::{
-        color_label::{ColorLabel, ColorLabelStyle},
-        dialog_button::{DialogButton, DialogContent, DialogRoot},
-        popover_button::{PopoverButton, PopoverContent, PopoverRoot},
+        color_label::{ColorLabel, ColorLabelStyle}, device_asset_config::EditDeviceForm, dialog_button::{DialogButton, DialogContent, DialogRoot}, popover_button::{PopoverButton, PopoverContent, PopoverRoot},
     }, device_details_ota::DeviceDetailsOta, light_control::LightControlView, server_state::ServerState,
 };
 
@@ -68,12 +66,15 @@ enum Route {
     EndpointsPage {},
     #[route("/commission")]
     CommissionForm {},
+    #[route("/users")]
+    UsersPage {},
 }
 
 const FAVICON: Asset = asset!("/assets/favicon.ico");
 const FAVICON_SVG: Asset = asset!("/assets/favicon.svg");
 const MAIN_CSS: Asset = asset!("/assets/main.css");
 const DEVICE_CSS: Asset = asset!("/assets/device.css");
+const COMPONENT_CSS: Asset = asset!("/assets/component.css");
 // const HEADER_SVG: Asset = asset!("/assets/header.svg");
 
 #[cfg(feature = "server")]
@@ -89,11 +90,7 @@ fn main() {
 
     #[cfg(feature = "server")]
     dioxus::serve(|| async move {
-        use dioxus::server::axum::Extension;
-
-        let matter = backend::matter::MatterManager::new().await.unwrap();
-
-        let router = dioxus::server::router(App).layer(Extension(matter));
+        let router = backend::add_router_layers(dioxus::server::router(App)).await;
 
         Ok(router)
     })
@@ -110,6 +107,7 @@ fn App() -> Element {
         document::Link { rel: "icon", href: FAVICON_SVG, r#type: "image/svg+xml" }
         document::Link { rel: "stylesheet", href: MAIN_CSS }
         document::Link { rel: "stylesheet", href: DEVICE_CSS }
+        document::Link { rel: "stylesheet", href: COMPONENT_CSS }
         Router::<Route> {}
     }
 }
@@ -133,6 +131,7 @@ fn Navbar() -> Element {
             Link { to: Route::AssetsPage {}, "Assets" }
             Link { to: Route::EndpointsPage {}, "Endpoints" }
             Link { to: Route::ThreadGraphPage {}, "Thread Graph" }
+            Link { to: Route::UsersPage {}, "Users" }
 
             div { class: "spacer" }
 
@@ -229,18 +228,18 @@ fn DeviceListEntry(device_id: u64, device: Store<DeviceInitStatus>) -> Element {
         DeviceInitStatus::Connecting {
             stage,
         } => match stage {
-            DeviceConnectionStage::Queued { .. } => "waiting",
-            DeviceConnectionStage::StartingListeners => "connecting",
-            DeviceConnectionStage::FetchingDeviceInfo => "connecting",
+            DeviceConnectionStage::Queued { .. } => "",
+            DeviceConnectionStage::StartingListeners => "warning",
+            DeviceConnectionStage::FetchingDeviceInfo => "warning",
             DeviceConnectionStage::Error(_) => "error",
         },
         DeviceInitStatus::Connected {
             device: _,
             subscription_status,
         } => match subscription_status {
-            Some(DeviceSubscriptionStatus::Established { .. }) => "connected",
-            Some(DeviceSubscriptionStatus::Resubscribing { .. }) => "connecting",
-            Some(DeviceSubscriptionStatus::Lagged { .. }) => "connected",
+            Some(DeviceSubscriptionStatus::Established { .. }) => "",
+            Some(DeviceSubscriptionStatus::Resubscribing { .. }) => "warning",
+            Some(DeviceSubscriptionStatus::Lagged { .. }) => "",
             Some(DeviceSubscriptionStatus::Closed) => "error",
             None => "waiting",
         },
@@ -274,8 +273,10 @@ fn DeviceListEntry(device_id: u64, device: Store<DeviceInitStatus>) -> Element {
     let get_room = move |label_id| assets.read().get_asset::<Room>(label_id).cloned();
     let get_label = move |label_id| assets.read().get_asset::<Label>(label_id).cloned();
 
+    let device_asset = get_device(device_id);
+
     let header = rsx! {
-        if let Some(device_asset) = get_device(device_id) {
+        if let Some(device_asset) = device_asset.clone() {
             {device_asset.config.name.clone()}
 
             div { class: "h-list",
@@ -345,7 +346,7 @@ fn DeviceListEntry(device_id: u64, device: Store<DeviceInitStatus>) -> Element {
 
     rsx! {
         div {
-            class: "device-list-entry device-card {connection_class}",
+            class: "device-list-entry card {connection_class}",
             key: "{device_id}",
             div { class: "h-list",
                 DialogRoot {
@@ -376,6 +377,21 @@ fn DeviceListEntry(device_id: u64, device: Store<DeviceInitStatus>) -> Element {
                                         information: (&*device.basic_information().read()).clone(),
                                         operational_credentials: (&*operational_credentials.read()).clone(),
                                         ota: (&*ota.read()).clone(),
+                                    }
+                                }
+                            }
+                        }
+
+                        if let Some(device_asset) = device_asset.clone() {
+                            DialogRoot {
+                                DialogButton {
+                                    Icon { icon: FaPen }
+                                    "Edit"
+                                }
+                                DialogContent { title: "Edit Device info",
+                                    EditDeviceForm {
+                                        id: device_id,
+                                        init_device: move |_| { device_asset.config.clone() },
                                     }
                                 }
                             }

@@ -13,7 +13,7 @@ pub fn DialogRoot(children: Element) -> Element {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct DialogCtx {
+pub struct DialogCtx {
     id: u64,
 }
 

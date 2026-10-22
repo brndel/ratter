@@ -22,21 +22,3 @@
         color: #ffffffa0;
     }
 }
-
-.device-card {
-    &.waiting {
-        border: 2pt solid rgb(47, 117, 223);
-    }
-
-    &.connecting {
-        border: 2pt solid rgb(255, 248, 48);
-    }
-
-    &.connected {
-        border: none;
-    }
-
-    &.error {
-        border: 2pt solid rgb(255, 55, 0);
-    }
-}

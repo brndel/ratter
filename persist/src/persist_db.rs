@@ -54,7 +54,7 @@ impl PersistDb {
     }
 
     #[cfg(feature = "cli")]
-    async fn create_db(path: impl AsRef<Path>) -> toasty::Result<toasty::Db> {
-        Self::create_db(path)
+    pub async fn create_db(path: impl AsRef<Path>) -> toasty::Result<toasty::Db> {
+        Self::create_db_private(path).await
     }
 }

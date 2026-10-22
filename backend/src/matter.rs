@@ -9,7 +9,7 @@ use matter_controller::{
     AttestationTrust, FabricConfig, FileStore, MatterController, MatterTime, OpenWindowOpts,
     ThreadDataset,
 };
-use persist::PersistDb;
+use persist::{PersistDb, UserRole};
 use tokio::{
     fs,
     sync::{
@@ -36,6 +36,7 @@ use shared_core::{
     thread::{ThreadGraphMessage, ThreadGraphMessageKind},
 };
 use tokio_stream::wrappers::UnboundedReceiverStream;
+use uuid::Uuid;
 
 use crate::{
     asset::AssetWatcher,
@@ -71,6 +72,10 @@ impl MatterManager {
         Ok(Self(inner))
     }
 
+    pub(crate) fn db(&self) -> &PersistDb {
+        &self.0.db
+    }
+
     pub async fn device_registry(&self) -> DeviceRegistry {
         let registry = &self.0.device_registry.read().await;
         let registry: &DeviceRegistry = &registry;
@@ -80,6 +85,7 @@ impl MatterManager {
     pub async fn bus_listener(&self) -> EventBusListener {
         self.0.event_bus.listen()
     }
+
 
     pub async fn run_device_action(
         &self,
@@ -118,11 +124,27 @@ impl MatterManager {
         pairing_code: &str,
         device_asset: DeviceAssetConfig,
         mode: DeviceCommissionMode,
-    ) -> Result<u64> {
+    ) -> Result<DeviceId> {
         self.0
             .clone()
             .commission_device(pairing_code, device_asset, mode)
             .await
+    }
+
+    pub async fn set_device_config(&self, device_id: DeviceId, config: DeviceAssetConfig) -> Result<()> {
+        let mut assets = self.0.asset_registry.write().await;
+
+        let Some(device) = assets.get_asset::<DeviceAsset>(device_id) else {
+            return Err(anyhow!("device with id {device_id} is not registered"));
+        };
+
+        let mut device = (&**device).clone();
+
+        device.config = config;
+
+        assets.set_asset(device_id, device).await?;
+
+        Ok(())
     }
 
     pub async fn dump_all_attrs(
@@ -148,43 +170,43 @@ impl MatterManager {
 
         let devices = self.0.device_registry.read().await;
 
-        for node in self.0.controller.nodes().await? {
-            info!("Node {} has ip: {:?}", node.node_id, node.last_known_addr);
-            if devices.is_connected(node.node_id) {
-                let ext_addr = if let Some(ip_addr) = node.last_known_addr
-                    && let Ok(trimmed_ip) = SocketAddr::from_str(&ip_addr)
-                    && let Some(addr) = address_map.get(&trimmed_ip.ip().to_string()).cloned()
-                {
-                    Some(addr)
-                } else {
-                    None
-                };
+        // for node in self.0.controller.nodes().await? {
+        //     info!("Node {} has ip: {:?}", node.node_id, node.last_known_addr);
+        //     if devices.is_connected(node.node_id) {
+        //         let ext_addr = if let Some(ip_addr) = node.last_known_addr
+        //             && let Ok(trimmed_ip) = SocketAddr::from_str(&ip_addr)
+        //             && let Some(addr) = address_map.get(&trimmed_ip.ip().to_string()).cloned()
+        //         {
+        //             Some(addr)
+        //         } else {
+        //             None
+        //         };
 
-                let id = node.node_id;
-                let node = self.0.controller.node(id);
-                let tx = tx.clone();
-                tokio::spawn(async move {
-                    let result = read_thread_data(&node, ext_addr).await;
-                    tx.send(ThreadGraphMessage {
-                        device: id,
-                        kind: match result {
-                            Ok(data) => ThreadGraphMessageKind::Discovered(data),
-                            Err(err) => ThreadGraphMessageKind::Error(err.to_string()),
-                        },
-                    })
-                });
-            } else {
-                if tx
-                    .send(ThreadGraphMessage {
-                        device: node.node_id,
-                        kind: ThreadGraphMessageKind::NotReadyYet,
-                    })
-                    .is_err()
-                {
-                    break;
-                }
-            }
-        }
+        //         let id = node.node_id;
+        //         let node = self.0.controller.node(id);
+        //         let tx = tx.clone();
+        //         tokio::spawn(async move {
+        //             let result = read_thread_data(&node, ext_addr).await;
+        //             tx.send(ThreadGraphMessage {
+        //                 device: id,
+        //                 kind: match result {
+        //                     Ok(data) => ThreadGraphMessageKind::Discovered(data),
+        //                     Err(err) => ThreadGraphMessageKind::Error(err.to_string()),
+        //                 },
+        //             })
+        //         });
+        //     } else {
+        //         if tx
+        //             .send(ThreadGraphMessage {
+        //                 device: node.node_id,
+        //                 kind: ThreadGraphMessageKind::NotReadyYet,
+        //             })
+        //             .is_err()
+        //         {
+        //             break;
+        //         }
+        //     }
+        // }
 
         Ok(UnboundedReceiverStream::new(rx))
     }
@@ -315,6 +337,20 @@ impl MatterManager {
     }
 }
 
+impl MatterManager {
+    pub async fn create_user(&self, name: &str, password: &str) -> Result<Uuid> {
+        let id = self.0.db.create_user(name, password, UserRole::User).await?;
+
+        Ok(id)
+    }
+
+    pub async fn get_all_users(&self) -> Result<Vec<(Uuid, String)>> {
+        let users = self.0.db.get_all_users().await?;
+
+        Ok(users)
+    }
+}
+
 impl MatterManagerInner {
     pub async fn new() -> anyhow::Result<Self> {
         let event_bus = EventBus::new();
@@ -377,6 +413,7 @@ impl MatterManagerInner {
                         .into_iter()
                         .map(|info| info.node_id);
                     // let nodes = [2, 4, 9, 39, 45, 43].iter().cloned();
+                    // let nodes = [].iter().cloned();
 
                     let total_nodes_count = nodes.len();
 

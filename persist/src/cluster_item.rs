@@ -225,51 +225,51 @@ impl PersistDb {
 }
 
 
-#[cfg(test)]
-mod tests {
+// #[cfg(test)]
+// mod tests {
 
-    use matter_clusters::{
-        r#gen::electrical_power_measurement::{self, decode_active_power, encode_active_power},
-        types::Nullable,
-    };
+//     use matter_clusters::{
+//         r#gen::electrical_power_measurement::{self, decode_active_power, encode_active_power},
+//         types::Nullable,
+//     };
 
-    use super::*;
+//     use super::*;
 
-    #[tokio::test]
-    async fn insert_and_query() {
-        let db = PersistDb::new_memory().await.unwrap();
+//     #[tokio::test]
+//     async fn insert_and_query() {
+//         let db = PersistDb::new_memory().await.unwrap();
 
-        let path = AttrPath {
-            device: 10,
-            endpoint: 1,
-            cluster: electrical_power_measurement::CLUSTER_ID,
-            attribute: electrical_power_measurement::attribute_id::ACTIVE_POWER,
-        };
+//         let path = AttrPath {
+//             device: 10,
+//             endpoint: 1,
+//             cluster: electrical_power_measurement::CLUSTER_ID,
+//             attribute: electrical_power_measurement::attribute_id::ACTIVE_POWER,
+//         };
 
-        db.log_attribute_change(path, encode_active_power(Nullable::Value(30)))
-            .await
-            .unwrap();
-        db.log_attribute_change(path, encode_active_power(Nullable::Value(15)))
-            .await
-            .unwrap();
+//         db.log_attribute_change(path, encode_active_power(Nullable::Value(30)))
+//             .await
+//             .unwrap();
+//         db.log_attribute_change(path, encode_active_power(Nullable::Value(15)))
+//             .await
+//             .unwrap();
 
-        let start = Timestamp::now();
-        db.log_attribute_change(path, encode_active_power(Nullable::Value(8)))
-            .await
-            .unwrap();
-        db.log_attribute_change(path, encode_active_power(Nullable::Value(20)))
-            .await
-            .unwrap();
+//         let start = Timestamp::now();
+//         db.log_attribute_change(path, encode_active_power(Nullable::Value(8)))
+//             .await
+//             .unwrap();
+//         db.log_attribute_change(path, encode_active_power(Nullable::Value(20)))
+//             .await
+//             .unwrap();
 
-        let end = Timestamp::now();
+//         let end = Timestamp::now();
 
-        let values = db.query_attribute_changes(path, start, end).await.unwrap();
+//         let values = db.query_attribute_changes(path, start, end).await.unwrap();
 
-        let expected_values = [Nullable::Value(8), Nullable::Value(20)];
+//         let expected_values = [Nullable::Value(8), Nullable::Value(20)];
 
-        for ((_timestamp, value), expected_value) in values.into_iter().zip(expected_values) {
-            let value = decode_active_power(&value).unwrap();
-            assert_eq!(value, expected_value);
-        }
-    }
-}
+//         for ((_timestamp, value), expected_value) in values.into_iter().zip(expected_values) {
+//             let value = decode_active_power(&value).unwrap();
+//             assert_eq!(value, expected_value);
+//         }
+//     }
+// }

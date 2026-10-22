@@ -6,6 +6,7 @@ pub mod id;
 pub mod util;
 pub mod thread;
 pub mod ota;
+pub mod value;
 
 #[cfg(feature = "backend")]
 pub mod backend;

@@ -561,6 +561,7 @@ dependencies = [
  "tokio-stream",
  "tokio-util",
  "toml 1.1.6+spec-1.1.0",
+ "uuid",
 ]
 
 [[package]]
@@ -1247,6 +1248,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ca0197aee26d1ae37445ee532fefce43251d24cc7c166799f4d46817f1d3973"
 dependencies = [
  "crossbeam-utils",
+]
+
+[[package]]
+name = "condition-engine"
+version = "0.1.0"
+dependencies = [
+ "jiff",
+ "serde",
+ "tokio",
 ]
 
 [[package]]
@@ -5088,7 +5098,7 @@ checksum = "47e1ffaa40ddd1f3ed91f717a33c8c0ee23fff369e3aa8772b9605cc1d22f4c3"
 [[package]]
 name = "matter-bdx"
 version = "0.3.1"
-source = "git+https://github.com/brndel/matter-rust?rev=ae1e577f6d552a0ba1f7774dd1032bc23cdd47d2#ae1e577f6d552a0ba1f7774dd1032bc23cdd47d2"
+source = "git+https://github.com/brndel/matter-rust?rev=dbfed5f757480aae01ac8c8f8b48e32e76b8e41b#dbfed5f757480aae01ac8c8f8b48e32e76b8e41b"
 dependencies = [
  "bitflags 2.13.2",
  "thiserror 2.0.20",
@@ -5097,7 +5107,7 @@ dependencies = [
 [[package]]
 name = "matter-ble"
 version = "0.3.4"
-source = "git+https://github.com/brndel/matter-rust?rev=ae1e577f6d552a0ba1f7774dd1032bc23cdd47d2#ae1e577f6d552a0ba1f7774dd1032bc23cdd47d2"
+source = "git+https://github.com/brndel/matter-rust?rev=dbfed5f757480aae01ac8c8f8b48e32e76b8e41b#dbfed5f757480aae01ac8c8f8b48e32e76b8e41b"
 dependencies = [
  "bitflags 2.13.2",
  "btleplug",
@@ -5110,7 +5120,7 @@ dependencies = [
 [[package]]
 name = "matter-cert"
 version = "0.3.2"
-source = "git+https://github.com/brndel/matter-rust?rev=ae1e577f6d552a0ba1f7774dd1032bc23cdd47d2#ae1e577f6d552a0ba1f7774dd1032bc23cdd47d2"
+source = "git+https://github.com/brndel/matter-rust?rev=dbfed5f757480aae01ac8c8f8b48e32e76b8e41b#dbfed5f757480aae01ac8c8f8b48e32e76b8e41b"
 dependencies = [
  "bitflags 2.13.2",
  "der 0.7.10",
@@ -5121,8 +5131,8 @@ dependencies = [
 
 [[package]]
 name = "matter-clusters"
-version = "0.5.0"
-source = "git+https://github.com/brndel/matter-rust?rev=ae1e577f6d552a0ba1f7774dd1032bc23cdd47d2#ae1e577f6d552a0ba1f7774dd1032bc23cdd47d2"
+version = "0.6.0"
+source = "git+https://github.com/brndel/matter-rust?rev=dbfed5f757480aae01ac8c8f8b48e32e76b8e41b#dbfed5f757480aae01ac8c8f8b48e32e76b8e41b"
 dependencies = [
  "bitflags 2.13.2",
  "matter-codec",
@@ -5132,16 +5142,16 @@ dependencies = [
 
 [[package]]
 name = "matter-codec"
-version = "0.3.1"
-source = "git+https://github.com/brndel/matter-rust?rev=ae1e577f6d552a0ba1f7774dd1032bc23cdd47d2#ae1e577f6d552a0ba1f7774dd1032bc23cdd47d2"
+version = "0.3.2"
+source = "git+https://github.com/brndel/matter-rust?rev=dbfed5f757480aae01ac8c8f8b48e32e76b8e41b#dbfed5f757480aae01ac8c8f8b48e32e76b8e41b"
 dependencies = [
  "thiserror 2.0.20",
 ]
 
 [[package]]
 name = "matter-commissioning"
-version = "0.10.0"
-source = "git+https://github.com/brndel/matter-rust?rev=ae1e577f6d552a0ba1f7774dd1032bc23cdd47d2#ae1e577f6d552a0ba1f7774dd1032bc23cdd47d2"
+version = "0.10.2"
+source = "git+https://github.com/brndel/matter-rust?rev=dbfed5f757480aae01ac8c8f8b48e32e76b8e41b#dbfed5f757480aae01ac8c8f8b48e32e76b8e41b"
 dependencies = [
  "base64 0.23.1",
  "bitflags 2.13.2",
@@ -5162,8 +5172,8 @@ dependencies = [
 
 [[package]]
 name = "matter-controller"
-version = "0.15.0"
-source = "git+https://github.com/brndel/matter-rust?rev=ae1e577f6d552a0ba1f7774dd1032bc23cdd47d2#ae1e577f6d552a0ba1f7774dd1032bc23cdd47d2"
+version = "0.18.3"
+source = "git+https://github.com/brndel/matter-rust?rev=dbfed5f757480aae01ac8c8f8b48e32e76b8e41b#dbfed5f757480aae01ac8c8f8b48e32e76b8e41b"
 dependencies = [
  "matter-bdx",
  "matter-ble",
@@ -5183,8 +5193,8 @@ dependencies = [
 
 [[package]]
 name = "matter-crypto"
-version = "0.5.0"
-source = "git+https://github.com/brndel/matter-rust?rev=ae1e577f6d552a0ba1f7774dd1032bc23cdd47d2#ae1e577f6d552a0ba1f7774dd1032bc23cdd47d2"
+version = "0.5.1"
+source = "git+https://github.com/brndel/matter-rust?rev=dbfed5f757480aae01ac8c8f8b48e32e76b8e41b#dbfed5f757480aae01ac8c8f8b48e32e76b8e41b"
 dependencies = [
  "aes 0.9.3",
  "ccm",
@@ -5199,8 +5209,8 @@ dependencies = [
 
 [[package]]
 name = "matter-interaction"
-version = "0.4.1"
-source = "git+https://github.com/brndel/matter-rust?rev=ae1e577f6d552a0ba1f7774dd1032bc23cdd47d2#ae1e577f6d552a0ba1f7774dd1032bc23cdd47d2"
+version = "0.4.3"
+source = "git+https://github.com/brndel/matter-rust?rev=dbfed5f757480aae01ac8c8f8b48e32e76b8e41b#dbfed5f757480aae01ac8c8f8b48e32e76b8e41b"
 dependencies = [
  "matter-codec",
  "thiserror 2.0.20",
@@ -5208,8 +5218,8 @@ dependencies = [
 
 [[package]]
 name = "matter-ota"
-version = "0.5.1"
-source = "git+https://github.com/brndel/matter-rust?rev=ae1e577f6d552a0ba1f7774dd1032bc23cdd47d2#ae1e577f6d552a0ba1f7774dd1032bc23cdd47d2"
+version = "0.6.0"
+source = "git+https://github.com/brndel/matter-rust?rev=dbfed5f757480aae01ac8c8f8b48e32e76b8e41b#dbfed5f757480aae01ac8c8f8b48e32e76b8e41b"
 dependencies = [
  "matter-clusters",
  "matter-codec",
@@ -5219,8 +5229,8 @@ dependencies = [
 
 [[package]]
 name = "matter-transport"
-version = "0.7.1"
-source = "git+https://github.com/brndel/matter-rust?rev=ae1e577f6d552a0ba1f7774dd1032bc23cdd47d2#ae1e577f6d552a0ba1f7774dd1032bc23cdd47d2"
+version = "0.7.4"
+source = "git+https://github.com/brndel/matter-rust?rev=dbfed5f757480aae01ac8c8f8b48e32e76b8e41b#dbfed5f757480aae01ac8c8f8b48e32e76b8e41b"
 dependencies = [
  "bitflags 2.13.2",
  "matter-codec",
@@ -6094,9 +6104,12 @@ checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
 name = "persist"
 version = "0.1.0"
 dependencies = [
+ "base64 0.23.1",
  "jiff",
  "matter-clusters",
+ "rand 0.10.3",
  "serde",
+ "sha2 0.11.0",
  "shared-core",
  "thiserror 2.0.20",
  "toasty",
@@ -6925,6 +6938,7 @@ dependencies = [
  "rand 0.10.3",
  "serde",
  "shared-core",
+ "uuid",
  "web-sys",
  "wobble-graph",
 ]

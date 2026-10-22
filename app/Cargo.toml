@@ -25,6 +25,7 @@ backend = { workspace = true, optional = true }
 rand.workspace = true
 itertools.workspace = true
 jiff.workspace = true
+uuid.workspace = true
 
 getrandom_0_3_4.workspace = true
 getrandom_0_4_3.workspace = true

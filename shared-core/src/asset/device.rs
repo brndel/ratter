@@ -12,7 +12,7 @@ pub struct DeviceAsset {
     pub endpoints: BTreeMap<EndpointId, BTreeSet<DeviceAssetDeviceKind>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct DeviceAssetConfig {
     pub name: String,
     pub room: Option<AssetId>,

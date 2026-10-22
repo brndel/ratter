@@ -1,6 +1,13 @@
 [workspace]
 resolver = "3"
-members = ["app", "backend", "persist", "shared-core", "wobble-graph"]
+members = [
+    "app",
+    "backend",
+    "condition-engine",
+    "persist",
+    "shared-core",
+    "wobble-graph",
+]
 
 default-members = ["app"]
 
@@ -10,18 +17,23 @@ backend.path = "backend"
 shared-core.path = "shared-core"
 wobble-graph.path = "wobble-graph"
 persist.path = "persist"
+condition-engine.path = "condition-engine"
 
-# matter-controller = { version = "0.14.0", features = ["ble"] }
-# matter-clusters = "0.5.0"
-# matter-interaction = "0.4.1"
-# matter-commissioning = "0.10.0"
-# matter-codec = "0.3.1"
+# matter-controller = { version = "0.18.3", features = ["ble"] }
+# matter-clusters = "0.6.0"
+# matter-interaction = "0.4.3"
+# matter-commissioning = "0.10.2"
+# matter-codec = "0.3.2"
 
-matter-controller = { git = "https://github.com/brndel/matter-rust", rev = "ae1e577f6d552a0ba1f7774dd1032bc23cdd47d2", features = ["ble"] }
-matter-clusters = { git = "https://github.com/brndel/matter-rust", rev = "ae1e577f6d552a0ba1f7774dd1032bc23cdd47d2", features = ["serde"]}
-matter-interaction = { git = "https://github.com/brndel/matter-rust", rev = "ae1e577f6d552a0ba1f7774dd1032bc23cdd47d2" }
-matter-commissioning = { git = "https://github.com/brndel/matter-rust", rev = "ae1e577f6d552a0ba1f7774dd1032bc23cdd47d2" }
-matter-codec = { git = "https://github.com/brndel/matter-rust", rev = "ae1e577f6d552a0ba1f7774dd1032bc23cdd47d2" }
+matter-controller = { git = "https://github.com/brndel/matter-rust", rev = "dbfed5f757480aae01ac8c8f8b48e32e76b8e41b", features = [
+    "ble",
+] }
+matter-clusters = { git = "https://github.com/brndel/matter-rust", rev = "dbfed5f757480aae01ac8c8f8b48e32e76b8e41b", features = [
+    "serde",
+] }
+matter-interaction = { git = "https://github.com/brndel/matter-rust", rev = "dbfed5f757480aae01ac8c8f8b48e32e76b8e41b" }
+matter-commissioning = { git = "https://github.com/brndel/matter-rust", rev = "dbfed5f757480aae01ac8c8f8b48e32e76b8e41b" }
+matter-codec = { git = "https://github.com/brndel/matter-rust", rev = "dbfed5f757480aae01ac8c8f8b48e32e76b8e41b" }
 
 
 # matter-controller = { path = "../matter-rust/crates/matter-controller", features = ["ble"] }
@@ -37,9 +49,10 @@ dioxus-stores = { version = "0.7.9" }
 dioxus-free-icons = { version = "0.10", features = ["font-awesome-solid"] }
 web-sys = { version = "0.3.103", features = ["ToggleEvent"] }
 
-serde = "1.0"
+serde = { version = "1.0", features = ["derive"] }
 serde_with = "3.23"
 serde_json = "1.0"
+uuid = {version = "1.26", features = ["serde"]}
 anyhow = "1.0"
 thiserror = "2.0"
 futures = "0.3"
@@ -47,7 +60,7 @@ derive_more = "2.1"
 nest_struct = "0.5"
 
 notify = "8.2.0"
-tokio = "1.53"
+tokio = { version = "1.53", features = ["sync"] }
 tokio-util = "0.7.19"
 tokio-stream = "0.1.19"
 gloo-timers = "0.4"
@@ -64,10 +77,15 @@ getrandom_0_2_17 = { package = "getrandom", version = "0.2.17" }
 getrandom_0_3_4 = { package = "getrandom", version = "0.3.4" }
 getrandom_0_4_3 = { package = "getrandom", version = "0.4.3" }
 
-reqwest = {version = "0.13", features = ["json"]}
+reqwest = { version = "0.13", features = ["json"] }
 sha2 = "0.11"
 sha3 = "0.12"
 
 # backend
-toasty = { version = "0.10.0", default-features = false, features = ["migration", "sqlite", "serde", "jiff"] }
+toasty = { version = "0.10.0", default-features = false, features = [
+    "migration",
+    "sqlite",
+    "serde",
+    "jiff",
+] }
 toasty-cli.version = "0.10.0"
