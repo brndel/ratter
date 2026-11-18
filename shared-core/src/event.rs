@@ -1,5 +1,4 @@
 use derive_more::From;
-use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 use crate::{

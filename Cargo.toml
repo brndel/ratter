@@ -4,9 +4,11 @@ members = [
     "app",
     "backend",
     "condition-engine",
+    "numbers",
     "persist",
+    "ratter-cluster",
     "shared-core",
-    "wobble-graph",
+    "wobble-graph", "xtask",
 ]
 
 default-members = ["app"]
@@ -18,6 +20,8 @@ shared-core.path = "shared-core"
 wobble-graph.path = "wobble-graph"
 persist.path = "persist"
 condition-engine.path = "condition-engine"
+numbers.path = "numbers"
+ratter-cluster.path = "ratter-cluster"
 
 # matter-controller = { version = "0.18.3", features = ["ble"] }
 # matter-clusters = "0.6.0"
@@ -42,6 +46,9 @@ matter-codec = { git = "https://github.com/brndel/matter-rust", rev = "dbfed5f75
 # matter-commissioning = { path = "../matter-rust/crates/matter-commissioning" }
 # matter-codec = { path = "../matter-rust/crates/matter-codec" }
 
+quick-xml = "0.42"
+change-case = "0.2"
+strum = {version = "0.28", features = ["derive"]}
 
 dioxus = { version = "0.7.9", features = ["router", "fullstack"] }
 dioxus-html = { version = "0.7.9", features = ["serialize"] }
@@ -52,12 +59,13 @@ web-sys = { version = "0.3.103", features = ["ToggleEvent"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_with = "3.23"
 serde_json = "1.0"
-uuid = {version = "1.26", features = ["serde"]}
+uuid = { version = "1.26", features = ["serde"] }
 anyhow = "1.0"
 thiserror = "2.0"
 futures = "0.3"
 derive_more = "2.1"
 nest_struct = "0.5"
+bitflags = "2.13"
 
 notify = "8.2.0"
 tokio = { version = "1.53", features = ["sync"] }

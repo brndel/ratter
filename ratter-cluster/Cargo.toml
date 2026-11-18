@@ -1,0 +1,10 @@
+[package]
+name = "ratter-cluster"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+matter-codec.workspace = true
+thiserror.workspace = true
+bitflags.workspace = true
+derive_more = { workspace = true, features = ["into"]}

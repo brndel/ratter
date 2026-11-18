@@ -3,7 +3,6 @@ pub mod attr_dump;
 pub mod device;
 pub mod event;
 pub mod id;
-pub mod util;
 pub mod thread;
 pub mod ota;
 pub mod value;
